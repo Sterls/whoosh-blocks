@@ -6,6 +6,7 @@ import * as store from './storage.js';
 import { play, unlockAudio, setSoundEnabled } from './audio.js';
 import * as board from './leaderboard.js';
 import { nameProblem } from './names.js';
+import { confetti } from './confetti.js';
 
 const $ = (id) => document.getElementById(id);
 let save = store.load();
@@ -317,17 +318,61 @@ function challengeResult(level) {
   return null;
 }
 
+// ---------- celebrations ----------
+
+const CHEERS = {
+  3: ['Perfect!', 'Flawless!', 'Brilliant!', 'Spotless!', 'Masterful!'],
+  2: ['Great job!', 'Nicely done!', 'Smooth!', 'Lovely!'],
+  1: ['Well done!', 'You did it!', 'Cleared!', 'Got there!'],
+};
+const pick = (list) => list[Math.floor(Math.random() * list.length)];
+
+// Quick runs of cubes climb a musical scale; a pause or a bump starts again.
+let combo = 0;
+let lastPop = 0;
+
+function onCubeRemoved(remaining) {
+  const now = performance.now();
+  if (now - lastPop > 1500) combo = 0;
+  lastPop = now;
+  play('pop', combo++);
+  vibrate(8);
+  if (remaining === 0) {
+    play('finale');
+    vibrate([15, 40, 15, 40, 30]);
+    confetti(levelColors());
+  }
+}
+
+function levelColors() {
+  const fromCubes = current.cubes.map((c) => c[4]).filter(Boolean);
+  const colors = [...new Set(fromCubes.length ? fromCubes : current.palette)];
+  return [...colors, '#ffc53d', '#6c63ff', '#ffffff'];
+}
+
 function onWin(mistakes) {
   const stars = starsFor(mistakes);
   const result = challengeResult(current);
+  const firstClear = currentLevel >= save.unlocked;
   save.stars[currentLevel] = Math.max(save.stars[currentLevel] || 0, stars);
   if (result?.trophy) save.trophies[currentLevel] = true;
   save.unlocked = Math.max(save.unlocked, currentLevel + 1);
+  // Count clean (no-bump) clears in a row.
+  save.perfectStreak = mistakes === 0 ? (save.perfectStreak || 0) + 1 : 0;
   store.save(save);
   submitScore();
   play('win');
-  vibrate([20, 60, 20]);
   updateGoal();
+
+  const milestone = firstClear && currentLevel % 10 === 0;
+  if (milestone) setTimeout(() => confetti(levelColors(), { count: 160, duration: 3200 }), 300);
+
+  const cubes = current.cubes.length;
+  $('win-stats').textContent = `${cubes} cubes cleared` + (game.elapsed >= 1 ? ` in ${formatTime(game.elapsed)}` : '');
+  const streak = save.perfectStreak;
+  $('win-streak').textContent = streak >= 2 ? `🔥 ${streak} perfect levels in a row!` : '';
+  $('win-streak').classList.toggle('hidden', streak < 2);
+  $('win-title').classList.toggle('milestone', milestone);
 
   $('win-stars').classList.toggle('hidden', Boolean(result));
   $('win-trophy').classList.toggle('hidden', !result);
@@ -339,10 +384,13 @@ function onWin(mistakes) {
   } else {
     $('win-stars').innerHTML = [1, 2, 3].map((i) =>
       STAR_SVG.replace('<svg', `<svg class="${i <= stars ? 'on' : ''}"`)).join('');
-    const msgs = { 3: 'Perfect — no bumps!', 2: 'Great job!', 1: 'Well done!' };
-    $('win-title').textContent = 'Level complete!';
-    $('win-text').textContent = msgs[stars];
+    // Each earned star lands with its own note, in time with its animation.
+    for (let i = 0; i < stars; i++) setTimeout(() => play('star', i), 250 + i * 150);
+    const notes = { 3: 'Not a single bump.', 2: 'Only a bump or two.', 1: 'Every cube cleared.' };
+    $('win-title').textContent = pick(CHEERS[stars]);
+    $('win-text').textContent = notes[stars];
   }
+  if (milestone) $('win-title').textContent = `Level ${currentLevel} cleared! 🎉`;
   $('win').classList.remove('hidden');
 }
 
@@ -370,9 +418,8 @@ function openSettings() {
 function init() {
   try {
     game = new Game($('stage'), {
-      onRemove: () => {
-        play('pop');
-        vibrate(8);
+      onRemove: (remaining) => {
+        onCubeRemoved(remaining);
         updateLeft();
         if (!save.seenHelp) {
           save.seenHelp = true;
@@ -380,7 +427,7 @@ function init() {
           hideHelp();
         }
       },
-      onBump: () => { play('bump'); vibrate(35); },
+      onBump: () => { combo = 0; play('bump'); vibrate(35); },
       onMistake: updateMistakes,
       onTap: () => {
         updateGoal();

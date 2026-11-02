@@ -32,14 +32,32 @@ function tone({ type = 'sine', from, to = from, start = 0, dur, vol = 0.2 }) {
   osc.stop(t0 + dur + 0.02);
 }
 
-export function play(name) {
+// Notes of a major pentatonic scale, starting at C5. Any run of them sounds
+// pleasant, so quick runs of pops turn into little tunes.
+const PENTATONIC = [0, 2, 4, 7, 9];
+function note(step) {
+  const s = Math.min(step, 14); // stop climbing after three octaves
+  const semitones = Math.floor(s / 5) * 12 + PENTATONIC[s % 5];
+  return 523.25 * 2 ** (semitones / 12);
+}
+
+// `step` picks the note for 'pop' (each quick pop climbs the scale) and 'star'.
+export function play(name, step = 0) {
   if (!enabled || !ctx) return;
   switch (name) {
     case 'pop': {
-      const f = 520 + Math.random() * 120;
-      tone({ from: f, to: f * 1.9, dur: 0.14, vol: 0.18 });
+      const f = note(step);
+      tone({ from: f, to: f * 1.5, dur: 0.16, vol: 0.17 });
       break;
     }
+    case 'finale':
+      [0, 2, 4, 5, 7].forEach((s, i) => tone({ from: note(s + 5), dur: 0.22, start: i * 0.06, vol: 0.13 }));
+      tone({ type: 'triangle', from: note(10), dur: 0.7, start: 0.32, vol: 0.12 });
+      break;
+    case 'star':
+      tone({ from: note(5 + step * 2), dur: 0.4, vol: 0.16 });
+      tone({ from: note(10 + step * 2), dur: 0.3, vol: 0.06 });
+      break;
     case 'bump':
       tone({ type: 'triangle', from: 170, to: 80, dur: 0.18, vol: 0.3 });
       break;
