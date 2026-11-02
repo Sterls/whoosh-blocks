@@ -31,9 +31,9 @@ Tick items off as they're done (`- [x]`).
   - a contact email
 - [x] Link the privacy policy from the Settings screen.
 - [ ] Link the privacy policy from both store listings (text ready in `store/PLAY_STORE.md`).
-- [ ] Add a "Remove me from the leaderboard" button that deletes the player's
+- [x] Add a "Remove me from the leaderboard" button that deletes the player's
       row (new `delete_score(secret)` database function).
-- [ ] Decide how long scores are kept, e.g. delete entries inactive for
+- [x] Decide how long scores are kept, e.g. delete entries inactive for
       12 months with a scheduled database job.
 - [ ] Create the Supabase project in the London (`eu-west-2`) region and
       accept Supabase's Data Processing Addendum.
@@ -60,10 +60,10 @@ Tick items off as they're done (`- [x]`).
 
 Typed-in names shown to other players make this a "user-to-user service".
 
-- [ ] Block offensive names. Use a word filter in the app and the same check
+- [x] Block offensive names. Use a word filter in the app and the same check
       in the `submit_score` database function, so it can't be bypassed.
-- [ ] Add a "Report" option on each leaderboard row.
-- [ ] Add a way to hide or ban a name: a `hidden` flag on the scores table,
+- [x] Add a "Report" option on each leaderboard row.
+- [x] Add a way to hide or ban a name: a `hidden` flag on the scores table,
       excluded by the leaderboard view.
 - [ ] Decide who checks reports and how often, e.g. weekly, and write it down.
 - [ ] Do and record an Ofcom **illegal content risk assessment** (Ofcom
@@ -74,9 +74,9 @@ Typed-in names shown to other players make this a "user-to-user service".
 
 ## 5. Security and abuse
 
-- [ ] Rate-limit score submissions, e.g. at most a few per minute per
+- [x] Rate-limit score submissions, e.g. at most a few per minute per
       player, to stop spam and fake traffic.
-- [ ] Reject impossible scores, e.g. a jump of thousands of levels in minutes.
+- [x] Reject impossible scores, e.g. a jump of thousands of levels in minutes.
 - [ ] Add a Content Security Policy to the hosting so the page can only
       load its own files and talk to the leaderboard database.
 - [ ] Turn on database backups (Supabase Pro), or accept that a lost

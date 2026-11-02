@@ -177,11 +177,22 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .board-list .who { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .board-list .lvl { font-weight: 800; color: var(--accent); }
 .board-me {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 14px 4px 0; font-size: 16px; color: var(--ink-soft);
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 14px 4px 0; font-size: 16px; color: var(--ink-soft); text-align: center;
 }
 .link-btn { border: 0; background: none; color: var(--accent); font-weight: 700; font-size: 16px; padding: 8px; text-decoration: none; }
 .board-note { margin: -4px 0 0; font-size: 14px; color: var(--ink-soft); text-align: center; }
+.name-error { margin: 0; font-size: 15px; font-weight: 600; color: var(--danger); text-align: center; }
+.name-error:empty { display: none; }
+.board-me-actions { display: flex; gap: 12px; }
+.board-me-actions .link-btn { white-space: nowrap; }
+.link-btn.danger { color: var(--danger); }
+.report-btn {
+  border: 0; background: none; padding: 6px 8px; margin: -6px -8px -6px 0;
+  font-size: 18px; color: #b9b6cf; border-radius: 10px;
+}
+.report-btn:active { background: #f0eeff; }
+.reported { font-size: 13px; color: var(--ink-soft); }
 
 /* ---------- in-game ---------- */
 

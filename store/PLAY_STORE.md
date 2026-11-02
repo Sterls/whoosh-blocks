@@ -130,19 +130,20 @@ Perfect for a few minutes' break or a long, quiet puzzle session.
 ## Form answers (App content section)
 
 These are correct **while the leaderboard is switched off**, which it is until
-`js/config.js` is filled in. If the leaderboard is turned on, update the
-Data safety and content rating answers marked ⚠️.
+`js/config.js` is filled in. **When the leaderboard is turned on**, update the
+answers marked ⚠️ in Play Console (App content) before or as it goes live.
+No new app build is needed.
 
 | Form | Answer |
 |---|---|
 | Privacy policy | `https://sterls.github.io/whoosh-blocks/privacy.html` |
 | App access | All functionality is available without special access |
 | Ads | **No**, the app does not contain ads |
-| Content rating (IARC) | Category **Game**, then answer **No** to violence, sexual content, language, drugs, gambling. ⚠️ "Users can interact or exchange content": **No** (Yes once the leaderboard is on). Expected rating: PEGI 3 / Everyone. |
+| Content rating (IARC) | Category **Game**, then answer **No** to violence, sexual content, language, drugs, gambling. ⚠️ "Users can interact or exchange content": **No** (once the leaderboard is on: **Yes**. Players see each other's nicknames, and there's a filter, reporting and removal). Expected rating: PEGI 3 / Everyone. |
 | Target audience | **13–15, 16–17, 18+** (not under 13). "Could the app appeal to children?" **No** |
 | News app | No |
 | COVID-19 contact tracing / status | No |
-| Data safety | ⚠️ **No data collected, no data shared.** (Once the leaderboard is on: "Personal info → Name" and "App activity → Other actions" collected, **optional**, not shared, used for "App functionality", deletion on request.) |
+| Data safety | ⚠️ **No data collected, no data shared.** (Once the leaderboard is on: collected, **not shared**, **optional**, encrypted in transit, users can request deletion. Data types: **Personal info → Name** (the nickname), **App info and performance → Other** or **App activity → Other actions** (furthest level), **Device or other IDs** (the random player ID). Purpose for all: **App functionality**.) |
 | Government app | No |
 | Financial features | None |
 | Health | None |

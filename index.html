@@ -58,13 +58,17 @@
       <label for="name-input">Pick a name to join the leaderboard</label>
       <input id="name-input" maxlength="20" autocomplete="nickname" placeholder="A nickname" required>
       <p class="board-note">Shown publicly. Please don't use your real name.</p>
+      <p id="name-error" class="name-error" role="alert"></p>
       <button class="btn" type="submit">Join</button>
     </form>
     <p id="board-status" class="board-status"></p>
     <ol id="board-list" class="board-list"></ol>
     <footer id="board-me" class="board-me hidden">
       <span id="board-me-text"></span>
-      <button id="rename-btn" class="link-btn" type="button">Change name</button>
+      <span class="board-me-actions">
+        <button id="rename-btn" class="link-btn" type="button">Change name</button>
+        <button id="remove-btn" class="link-btn danger" type="button">Remove me</button>
+      </span>
     </footer>
   </section>
 

@@ -37,30 +37,36 @@ branch and the `/ (root)` folder, and save. After a minute it is live at
 
 ## Setting up the leaderboard (optional, free)
 
-The game is static, so the shared leaderboard lives in a free
-[Supabase](https://supabase.com) database. One-time setup:
+The Leaderboard button stays hidden until this is done. The shared
+leaderboard lives in a free [Supabase](https://supabase.com) database:
 
-1. Sign up at supabase.com and create a **New project** (free plan; any name
-   and region; save the database password somewhere, though the game doesn't need it).
-2. In the project, open **SQL Editor → New query**, paste the contents of
-   [`supabase/setup.sql`](supabase/setup.sql), and press **Run**.
-3. Open **Project Settings → API** (or **Connect**). Copy the **Project URL**
-   and the **anon / publishable** key into `js/config.js`:
+1. Sign up at supabase.com (with the game's Gmail) and create a **New
+   project**: free plan, region **London (eu-west-2)**, any name. Save the
+   database password somewhere safe; the game doesn't need it.
+2. In the project, open **SQL Editor → New query**, paste the whole of
+   [`supabase/setup.sql`](supabase/setup.sql) and press **Run**. It is safe
+   to run again after updates.
+3. Open **Project Settings → API keys** (or **Connect**) and copy the
+   **Project URL** and the **publishable** (or legacy **anon**) key into
+   `js/config.js`. Never use the **secret** / **service_role** key.
+4. Run `npm run stamp`, commit and push. Players get it through the update bar.
 
-   ```js
-   export const LEADERBOARD = {
-     url: 'https://abcdefghijk.supabase.co',
-     anonKey: 'eyJhbGciOi...',
-   };
-   ```
-4. Commit and push. Phones pick it up the next time the game is opened.
+What the database enforces:
 
-The anon key is designed to be public. The database only lets the game read
-names and levels and add or raise a player's own score. Each phone has a
-random secret id, so nobody can change another player's score. The leaderboard
-isn't cheat-proof, though: anyone with the link can submit a score. Free
-Supabase projects pause after a week with no activity; open the Supabase
-dashboard and click **Restore** if the board stops loading.
+- **Nickname filter** (same word lists as `js/names.js`): no swearing, slurs,
+  web addresses or unusual characters.
+- **Scores only rise, at a realistic pace**: at most one level per 20 seconds
+  since the last rise, plus a little slack. New entries start at level 100 or less.
+- **Reports**: three different players reporting a nickname hides it.
+- **Remove me** deletes a player's entry; entries idle for 12 months are deleted.
+- The public can read only nicknames and levels, never the players' secret ids.
+
+**Moderating:** in Supabase, open **Table Editor → scores**. Tick **hidden** to
+hide a nickname, untick it to restore one, or delete the row. **reports**
+shows which nicknames were reported. Check it weekly.
+
+Free Supabase projects pause after a week without any activity. If the
+leaderboard stops loading, open the Supabase dashboard and click **Restore**.
 
 ## Developing
 

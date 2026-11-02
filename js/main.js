@@ -5,6 +5,7 @@ import { getLevel, challengeType } from './levels.js';
 import * as store from './storage.js';
 import { play, unlockAudio, setSoundEnabled } from './audio.js';
 import * as board from './leaderboard.js';
+import { nameProblem } from './names.js';
 
 const $ = (id) => document.getElementById(id);
 let save = store.load();
@@ -69,6 +70,7 @@ function show(screen) {
     const trophies = Object.keys(save.trophies).length;
     $('trophy-count').textContent = `🏆 ${trophies} ${trophies === 1 ? 'trophy' : 'trophies'}`;
     $('trophy-count').classList.toggle('hidden', trophies === 0);
+    $('board-btn').classList.toggle('hidden', !board.isConfigured());
   } else if (screen === 'levels') {
     renderLevelGrid();
     $('levels').classList.remove('hidden');
@@ -143,6 +145,56 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+let shownRows = [];
+const reported = new Set(); // nicknames reported during this visit
+
+async function joinBoard(e) {
+  e.preventDefault();
+  const name = $('name-input').value.trim();
+  const problem = nameProblem(name);
+  $('name-error').textContent = problem;
+  if (problem) return;
+  play('click');
+  try {
+    await board.submit(save.playerId, name, bestLevel());
+  } catch (err) {
+    if (err.nameRejected) {
+      $('name-error').textContent = 'Please choose a friendlier nickname.';
+      return;
+    }
+    // Offline or similar: keep the name and send the score later.
+  }
+  save.name = name;
+  store.save(save);
+  $('name-input').blur();
+  renderBoard();
+}
+
+async function reportRow(i) {
+  const row = shownRows[i];
+  if (!row || !confirm(`Report "${row.name}" as an inappropriate nickname?`)) return;
+  try {
+    await board.report(save.playerId, row.name);
+    reported.add(row.name);
+    renderBoard();
+  } catch {
+    alert("Couldn't send the report. Check your internet and try again.");
+  }
+}
+
+async function removeMe() {
+  if (!confirm('Remove your nickname and score from the leaderboard? Your progress in the game is kept.')) return;
+  try {
+    await board.remove(save.playerId);
+  } catch {
+    alert("Couldn't remove you right now. Check your internet and try again.");
+    return;
+  }
+  save.name = '';
+  store.save(save);
+  renderBoard();
+}
+
 async function renderBoard({ askName = false } = {}) {
   const list = $('board-list'), status = $('board-status');
   const joining = askName || !save.name;
@@ -156,6 +208,7 @@ async function renderBoard({ askName = false } = {}) {
   }
   if (joining) {
     status.textContent = '';
+    $('name-error').textContent = '';
     $('name-input').value = save.name;
     $('board-join').classList.remove('hidden');
     return;
@@ -170,12 +223,20 @@ async function renderBoard({ askName = false } = {}) {
     if ($('board').classList.contains('hidden')) return;
     status.textContent = rows.length ? 'Furthest level beaten' : 'No scores yet. Beat a level to get on the board!';
     const medals = ['🥇', '🥈', '🥉'];
-    list.innerHTML = rows.map((r, i) => `
-      <li class="${r.name === save.name ? 'me' : ''}">
+    shownRows = rows;
+    list.innerHTML = rows.map((r, i) => {
+      const mine = r.name === save.name;
+      const flag = mine ? ''
+        : reported.has(r.name) ? '<span class="reported">Reported</span>'
+        : `<button class="report-btn" data-row="${i}" aria-label="Report this nickname">⚑</button>`;
+      return `
+      <li class="${mine ? 'me' : ''}">
         <span class="rank">${medals[i] || i + 1}</span>
         <span class="who">${escapeHtml(r.name)}</span>
         <span class="lvl">Level ${r.level}</span>
-      </li>`).join('');
+        ${flag}
+      </li>`;
+    }).join('');
   } catch {
     status.textContent = "Couldn't load the leaderboard. Check your internet and try again.";
   }
@@ -341,17 +402,13 @@ function init() {
   $('play-btn').addEventListener('click', () => { play('click'); go('game', { level: save.unlocked }); });
   $('levels-btn').addEventListener('click', () => { play('click'); go('levels'); });
   $('board-btn').addEventListener('click', () => { play('click'); go('board'); });
-  $('board-join').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const name = $('name-input').value.trim().slice(0, 20);
-    if (!name) return;
-    save.name = name;
-    store.save(save);
-    $('name-input').blur();
-    play('click');
-    renderBoard();
-  });
+  $('board-join').addEventListener('submit', joinBoard);
   $('rename-btn').addEventListener('click', () => { play('click'); renderBoard({ askName: true }); });
+  $('remove-btn').addEventListener('click', () => { play('click'); removeMe(); });
+  $('board-list').addEventListener('click', (e) => {
+    const btn = e.target.closest('.report-btn');
+    if (btn) reportRow(Number(btn.dataset.row));
+  });
   $('settings-btn').addEventListener('click', () => { play('click'); go('home', { modal: 'settings' }); });
   for (const b of document.querySelectorAll('[data-back]')) {
     b.addEventListener('click', () => { play('click'); history.back(); });
