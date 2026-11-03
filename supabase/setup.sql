@@ -200,8 +200,9 @@ begin
 end;
 $$;
 
--- Record a friend's attempt, keeping their best. The creator's own replays
--- aren't recorded, and each challenge keeps at most 100 players.
+-- Record an attempt, keeping each player's best. When the challenge's creator
+-- replays it ("Beat your score"), their own score improves instead. Each
+-- challenge keeps at most 100 players.
 create or replace function public.submit_duel_result(p_code text, p_secret uuid, p_name text, p_time_ms int, p_bumps int)
 returns json
 language plpgsql
@@ -221,9 +222,14 @@ begin
     raise exception 'challenge not found' using errcode = '22023';
   end if;
 
-  if not exists (select 1 from duels where code = v_code and creator = p_secret)
-     and (exists (select 1 from duel_results where code = v_code and player = p_secret)
-          or (select count(*) from duel_results where code = v_code) < 100) then
+  if exists (select 1 from duels where code = v_code and creator = p_secret) then
+    update duels set
+      name = trim(p_name),
+      time_ms = case when p_time_ms + 5000 * p_bumps < time_ms + 5000 * bumps then p_time_ms else time_ms end,
+      bumps = case when p_time_ms + 5000 * p_bumps < time_ms + 5000 * bumps then p_bumps else bumps end
+    where code = v_code;
+  elsif exists (select 1 from duel_results where code = v_code and player = p_secret)
+        or (select count(*) from duel_results where code = v_code) < 100 then
     insert into duel_results (code, player, name, time_ms, bumps)
       values (v_code, p_secret, trim(p_name), p_time_ms, p_bumps)
     on conflict (code, player) do update set

@@ -282,7 +282,8 @@ function startLevel(n, { retry = false, duel: d = null } = {}) {
   updateMistakes(0);
   updateGoal();
   hideHelp();
-  if (duel && !retry) showHelp(`<b>${escapeHtml(duel.name)}'s challenge</b><br>Beat ${describe(duel)}.<br>The clock starts on your first tap.`, 6);
+  if (duel?.own && !retry) showHelp(`<b>Your challenge</b><br>Beat ${duel.self ? 'your best' : escapeHtml(duel.name)}: ${describe(duel)}.<br>The clock starts on your first tap.`, 6);
+  else if (duel && !retry) showHelp(`<b>${escapeHtml(duel.name)}'s challenge</b><br>Beat ${describe(duel)}.<br>The clock starts on your first tap.`, 6);
   else if (current.challenge && !retry) showHelp(CHALLENGES[current.challenge].intro(current), 6);
   else if (n === 1 && !save.seenHelp) showHelp('Tap a cube to slide it out.<br>Drag to turn &middot; pinch to zoom.');
 }
@@ -532,6 +533,14 @@ async function acceptDuel(d) {
   go('game', { level: d.level, duel: d });
 }
 
+// Replay a challenge you sent, racing whoever leads it now (you, if nobody has beaten you).
+function beatOwnScore(d) {
+  const mine = { name: 'Your best', time_ms: d.time_ms, bumps: d.bumps, self: true };
+  const best = d.results[0];
+  const rival = best && duelScore(best) < duelScore(mine) ? best : mine;
+  go('game', { level: d.level, duel: { code: d.code, level: d.level, own: true, ...rival } });
+}
+
 async function onDuelWin(mistakes) {
   const d = duel;
   const mine = { name: save.name, time_ms: Math.max(500, Math.round(game.elapsed * 1000)), bumps: mistakes };
@@ -544,14 +553,19 @@ async function onDuelWin(mistakes) {
   $('win-trophy').classList.remove('hidden', 'missed');
   $('win-trophy').textContent = result === 'lose' ? '⚔️' : '🏆';
   $('win-title').classList.remove('milestone');
-  $('win-title').textContent = result === 'win' ? 'You win! 🎉' : result === 'tie' ? "It's a tie!" : `${d.name} wins this time`;
+  if (d.own) {
+    $('win-title').textContent = result === 'win' ? (d.self ? 'New best! 🎉' : "You're back on top! 🎉")
+      : result === 'tie' ? "It's a tie!" : d.self ? 'Not quite your best' : `${d.name} is still ahead`;
+  } else {
+    $('win-title').textContent = result === 'win' ? 'You win! 🎉' : result === 'tie' ? "It's a tie!" : `${d.name} wins this time`;
+  }
   $('win-text').textContent = `You: ${describe(mine)}\n${d.name}: ${describe(d)}`;
-  $('win-stats').textContent = result === 'lose' ? 'Have another go, or challenge them back!' : '';
+  $('win-stats').textContent = result !== 'lose' ? '' : d.own ? 'Have another go!' : 'Have another go, or challenge them back!';
   $('next-btn').classList.add('hidden');
   $('retry-btn').textContent = 'Try again';
   $('retry-btn').classList.remove('hidden');
   $('challenge-btn').textContent = '⚔️ Challenge back';
-  $('challenge-btn').classList.remove('hidden');
+  $('challenge-btn').classList.toggle('hidden', Boolean(d.own));
   lastResult = { level: currentLevel, time_ms: mine.time_ms, bumps: mine.bumps };
   $('win').classList.remove('hidden');
 
@@ -587,7 +601,7 @@ async function renderDuels() {
     }).join('');
     const nobody = x.role === 'sent' && !d.results.length ? '<p class="sub">No one has played it yet.</p>' : '';
     const action = x.role === 'sent'
-      ? `<button class="btn secondary" data-share="${i}">Share again</button>`
+      ? `<button class="btn secondary" data-share="${i}">Share again</button><button class="btn" data-beat="${i}">Beat your score</button>`
       : `<button class="btn" data-play="${i}">Play</button>`;
     return `<div class="duel-card"><h3>${heading}</h3>${nobody}<ol>${items}</ol><div class="actions">${action}</div></div>`;
   }).join('');
@@ -689,9 +703,11 @@ function init() {
   on('duels-list', 'click', (e) => {
     const share = e.target.closest('[data-share]');
     const playBtn = e.target.closest('[data-play]');
+    const beatBtn = e.target.closest('[data-beat]');
     const loaded = renderDuels.loaded || [];
     if (share && loaded[share.dataset.share]) { play('click'); shareDuel(loaded[share.dataset.share]); }
     if (playBtn && loaded[playBtn.dataset.play]) { play('click'); acceptDuel(loaded[playBtn.dataset.play]); }
+    if (beatBtn && loaded[beatBtn.dataset.beat]) { play('click'); beatOwnScore(loaded[beatBtn.dataset.beat]); }
   });
 
   // Keep the speed-challenge clock ticking on screen, and pause it while the
