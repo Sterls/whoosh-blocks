@@ -58,7 +58,10 @@ What the database enforces:
 - **Scores only rise, at a realistic pace**: at most one level per 20 seconds
   since the last rise, plus a little slack. New entries start at level 100 or less.
 - **Reports**: three different players reporting a nickname hides it.
-- **Remove me** deletes a player's entry; entries idle for 12 months are deleted.
+- **Remove me** deletes a player's entry (and their friend challenges); entries idle for 12 months are deleted.
+- **Friend challenges** ("Challenge a friend" on the win card): stored with a
+  6-character code, shared as a link (`…/whoosh-blocks/?c=CODE`), and deleted
+  after 30 days. Each player can send up to 30 a day.
 - The public can read only nicknames and levels, never the players' secret ids.
 
 **Moderating:** in Supabase, open **Table Editor → scores**. Tick **hidden** to

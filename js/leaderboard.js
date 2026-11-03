@@ -47,3 +47,23 @@ export async function report(reporterSecret, name) {
 export async function remove(secret) {
   await rpc('delete_score', { p_secret: secret });
 }
+
+// ---------- friend challenges ----------
+
+// Create a challenge from this player's result. Returns { code, name, level, time_ms, bumps, results }.
+export async function createDuel(secret, name, level, timeMs, bumps) {
+  const res = await rpc('create_duel', { p_secret: secret, p_name: name, p_level: level, p_time_ms: timeMs, p_bumps: bumps });
+  return res.json();
+}
+
+// A challenge and everyone's results, or null if it doesn't exist or has expired.
+export async function getDuel(code) {
+  const res = await rpc('get_duel', { p_code: code });
+  return res.json();
+}
+
+// Record a friend's attempt (their best is kept). Returns the updated challenge.
+export async function submitDuelResult(code, secret, name, timeMs, bumps) {
+  const res = await rpc('submit_duel_result', { p_code: code, p_secret: secret, p_name: name, p_time_ms: timeMs, p_bumps: bumps });
+  return res.json();
+}

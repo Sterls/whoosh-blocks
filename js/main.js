@@ -7,6 +7,7 @@ import { play, unlockAudio, setSoundEnabled } from './audio.js';
 import * as board from './leaderboard.js';
 import { nameProblem } from './names.js';
 import { confetti } from './confetti.js';
+import { duelScore, formatMs, describe, outcome, codeFromUrl, duelLink } from './duel.js';
 
 const $ = (id) => document.getElementById(id);
 // Wire a control if it exists, so one missing element can't stop the others working.
@@ -19,6 +20,8 @@ let currentLevel = 1;
 let current = null; // the level being played
 let helpTimer = null;
 let waitingWorker = null; // a downloaded new version, waiting for the player to tap Update
+let duel = null; // the friend's challenge being played, if any
+let lastResult = null; // { level, time_ms, bumps } of the last normal win, for challenging friends
 
 function vibrate(pattern) {
   if (!save.vibrate) return;
@@ -63,7 +66,7 @@ const LOCK_SVG = '<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height=
 // ---------- screens ----------
 
 function show(screen) {
-  for (const id of ['home', 'levels', 'board', 'hud', 'win', 'settings']) $(id).classList.add('hidden');
+  for (const id of ['home', 'levels', 'board', 'duels', 'hud', 'win', 'settings', 'duel-modal', 'name-modal']) $(id)?.classList.add('hidden');
   game?.setActive(screen === 'game');
   // Offer updates from the menus, never in the middle of a level.
   $('update-bar').classList.toggle('hidden', !waitingWorker || screen === 'game');
@@ -74,12 +77,16 @@ function show(screen) {
     $('trophy-count').textContent = `🏆 ${trophies} ${trophies === 1 ? 'trophy' : 'trophies'}`;
     $('trophy-count').classList.toggle('hidden', trophies === 0);
     $('board-btn').classList.toggle('hidden', !board.isConfigured());
+    $('duels-btn').classList.toggle('hidden', !board.isConfigured());
   } else if (screen === 'levels') {
     renderLevelGrid();
     $('levels').classList.remove('hidden');
   } else if (screen === 'board') {
     $('board').classList.remove('hidden');
     renderBoard();
+  } else if (screen === 'duels') {
+    $('duels').classList.remove('hidden');
+    renderDuels();
   } else if (screen === 'game') {
     $('hud').classList.remove('hidden');
   }
@@ -94,7 +101,7 @@ function go(screen, data = {}, replace = false) {
 
 function route(state) {
   const screen = state?.screen || 'home';
-  if (screen === 'game') startLevel(state.level || save.unlocked);
+  if (screen === 'game') startLevel(state.level || save.unlocked, { duel: state.duel });
   else show(screen);
   if (state?.modal === 'settings') openSettings();
 }
@@ -259,22 +266,36 @@ function hideHelp() {
   $('help').classList.add('hidden');
 }
 
-function startLevel(n, { retry = false } = {}) {
+function startLevel(n, { retry = false, duel: d = null } = {}) {
   currentLevel = n;
+  duel = d;
   current = getLevel(n);
+  if (duel) {
+    // A friend's challenge is a plain race: no trophy rules on top.
+    current = { ...current };
+    delete current.challenge;
+  }
   show('game');
   game.load(current);
-  $('hud-level').textContent = `Level ${n}`;
+  $('hud-level').textContent = duel ? `Level ${n} · ⚔️` : `Level ${n}`;
   updateLeft();
   updateMistakes(0);
   updateGoal();
   hideHelp();
-  if (current.challenge && !retry) showHelp(CHALLENGES[current.challenge].intro(current), 6);
+  if (duel && !retry) showHelp(`<b>${escapeHtml(duel.name)}'s challenge</b><br>Beat ${describe(duel)}.<br>The clock starts on your first tap.`, 6);
+  else if (current.challenge && !retry) showHelp(CHALLENGES[current.challenge].intro(current), 6);
   else if (n === 1 && !save.seenHelp) showHelp('Tap a cube to slide it out.<br>Drag to turn &middot; pinch to zoom.');
 }
 
 function updateGoal() {
   const goal = $('hud-goal');
+  if (duel) {
+    const mine = { time_ms: game.elapsed * 1000, bumps: game.mistakes };
+    goal.classList.remove('hidden');
+    goal.textContent = `⚔️ You ${formatMs(duelScore(mine))} · ${duel.name} ${formatMs(duelScore(duel))}`;
+    goal.classList.toggle('over', duelScore(mine) > duelScore(duel));
+    return;
+  }
   const info = current && CHALLENGES[current.challenge];
   goal.classList.toggle('hidden', !info);
   if (!info) return;
@@ -288,6 +309,11 @@ function updateLeft() {
 }
 
 function updateMistakes(m) {
+  $('hud-mistakes').classList.toggle('as-text', Boolean(duel));
+  if (duel) {
+    $('hud-mistakes').textContent = m ? `${m} bump${m === 1 ? '' : 's'} (+${m * 5}s)` : 'No bumps';
+    return;
+  }
   if (current?.challenge === 'perfect') {
     $('hud-mistakes').textContent = ''; // a bump restarts, so stars don't apply
     return;
@@ -353,6 +379,7 @@ function levelColors() {
 }
 
 function onWin(mistakes) {
+  if (duel) return onDuelWin(mistakes);
   const stars = starsFor(mistakes);
   const result = challengeResult(current);
   const firstClear = currentLevel >= save.unlocked;
@@ -376,6 +403,12 @@ function onWin(mistakes) {
   $('win-streak').classList.toggle('hidden', streak < 2);
   $('win-title').classList.toggle('milestone', milestone);
 
+  lastResult = { level: currentLevel, time_ms: Math.round(game.elapsed * 1000), bumps: mistakes };
+  $('next-btn').classList.remove('hidden');
+  $('challenge-btn').textContent = '⚔️ Challenge a friend';
+  $('challenge-btn').classList.toggle('hidden', !board.isConfigured() || lastResult.time_ms < 500);
+  $('retry-btn').textContent = 'Try again for the trophy';
+  $('win-trophy').textContent = '🏆';
   $('win-stars').classList.toggle('hidden', Boolean(result));
   $('win-trophy').classList.toggle('hidden', !result);
   $('retry-btn').classList.toggle('hidden', !result || result.trophy);
@@ -394,6 +427,171 @@ function onWin(mistakes) {
   }
   if (milestone) $('win-title').textContent = `Level ${currentLevel} cleared! 🎉`;
   $('win').classList.remove('hidden');
+}
+
+// ---------- friend challenges ----------
+
+function showToast(message, seconds = 4) {
+  const t = $('toast');
+  t.textContent = message;
+  t.classList.remove('hidden');
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => t.classList.add('hidden'), seconds * 1000);
+}
+
+// Remember challenges sent and received on this phone, newest first.
+function rememberDuel(role, d) {
+  const list = (save.duels || []).filter((x) => x.code !== d.code);
+  list.unshift({ code: d.code, role, level: d.level, name: d.name });
+  save.duels = list.slice(0, 30);
+  store.save(save);
+}
+
+// Resolves with the player's nickname, asking for one first if needed (null if cancelled).
+function ensureNickname(reason) {
+  if (save.name) return Promise.resolve(save.name);
+  return new Promise((resolve) => {
+    $('name-reason').textContent = reason;
+    $('nick-input').value = '';
+    $('nick-error').textContent = '';
+    $('name-modal').classList.remove('hidden');
+    ensureNickname.done = (name) => {
+      $('name-modal').classList.add('hidden');
+      resolve(name);
+    };
+  });
+}
+
+async function sendChallenge(result) {
+  const name = await ensureNickname('So your friend knows who challenged them.');
+  if (!name) return;
+  showToast('Creating your challenge…', 10);
+  let d;
+  try {
+    d = await board.createDuel(save.playerId, name, result.level, result.time_ms, result.bumps);
+  } catch (err) {
+    showToast(err.message === 'too many challenges today'
+      ? "That's a lot of challenges for one day! Try again tomorrow."
+      : "Couldn't create the challenge. Check your internet and try again.");
+    return;
+  }
+  $('toast').classList.add('hidden');
+  rememberDuel('sent', d);
+  await shareDuel(d);
+}
+
+async function shareDuel(d) {
+  const url = duelLink(d.code);
+  const text = `${d.name} challenges you to Whoosh Blocks level ${d.level}! Cleared in ${describe(d)}. Can you beat it?`;
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'Whoosh Blocks challenge', text, url });
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return; // they closed the share sheet
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(`${text} ${url}`);
+    showToast('Challenge link copied. Paste it in a message to a friend!');
+  } catch {
+    prompt('Copy this link and send it to a friend:', url);
+  }
+}
+
+// Someone opened a challenge link.
+async function openDuel(code) {
+  if (!board.isConfigured()) return;
+  let d;
+  try {
+    d = await board.getDuel(code);
+  } catch {
+    showToast("Couldn't load the challenge. Check your internet and try again.");
+    return;
+  }
+  if (!d) {
+    showToast("That challenge has expired or doesn't exist.");
+    return;
+  }
+  if ((save.duels || []).some((x) => x.code === d.code && x.role === 'sent')) {
+    go('duels'); // their own challenge: show how friends are doing
+    return;
+  }
+  rememberDuel('received', d);
+  pendingDuel = d;
+  $('duel-title').textContent = `${d.name} challenges you!`;
+  $('duel-text').textContent = `Level ${d.level} · ${describe(d)}`;
+  $('duel-modal').classList.remove('hidden');
+}
+let pendingDuel = null;
+
+async function acceptDuel(d) {
+  $('duel-modal').classList.add('hidden');
+  const name = await ensureNickname(`So ${d.name} can see your result.`);
+  if (!name) return;
+  go('game', { level: d.level, duel: d });
+}
+
+async function onDuelWin(mistakes) {
+  const d = duel;
+  const mine = { name: save.name, time_ms: Math.max(500, Math.round(game.elapsed * 1000)), bumps: mistakes };
+  const result = outcome(mine, d);
+  play('win');
+  if (result === 'win') setTimeout(() => confetti(levelColors(), { count: 160, duration: 3200 }), 300);
+
+  $('win-stars').classList.add('hidden');
+  $('win-streak').classList.add('hidden');
+  $('win-trophy').classList.remove('hidden', 'missed');
+  $('win-trophy').textContent = result === 'lose' ? '⚔️' : '🏆';
+  $('win-title').classList.remove('milestone');
+  $('win-title').textContent = result === 'win' ? 'You win! 🎉' : result === 'tie' ? "It's a tie!" : `${d.name} wins this time`;
+  $('win-text').textContent = `You: ${describe(mine)}\n${d.name}: ${describe(d)}`;
+  $('win-stats').textContent = result === 'lose' ? 'Have another go, or challenge them back!' : '';
+  $('next-btn').classList.add('hidden');
+  $('retry-btn').textContent = 'Try again';
+  $('retry-btn').classList.remove('hidden');
+  $('challenge-btn').textContent = '⚔️ Challenge back';
+  $('challenge-btn').classList.remove('hidden');
+  lastResult = { level: currentLevel, time_ms: mine.time_ms, bumps: mine.bumps };
+  $('win').classList.remove('hidden');
+
+  try {
+    await board.submitDuelResult(d.code, save.playerId, save.name, mine.time_ms, mine.bumps);
+  } catch {
+    showToast("Couldn't send your result. It wasn't saved, so try again when you're online.");
+  }
+}
+
+async function renderDuels() {
+  const list = $('duels-list'), status = $('duels-status');
+  const mine = save.duels || [];
+  list.innerHTML = '';
+  if (!mine.length) {
+    status.textContent = 'Beat a level, then tap "Challenge a friend" on the win screen to send your first challenge.';
+    return;
+  }
+  status.textContent = 'Loading…';
+  const loaded = await Promise.all(mine.map((x) => board.getDuel(x.code).catch(() => undefined)));
+  if ($('duels').classList.contains('hidden')) return;
+  status.textContent = loaded.includes(undefined) ? "Some challenges couldn't load. Check your internet." : '';
+  list.innerHTML = mine.map((x, i) => {
+    const d = loaded[i];
+    const heading = x.role === 'sent' ? `You challenged friends · Level ${x.level}` : `From ${escapeHtml(x.name)} · Level ${x.level}`;
+    if (d === null) return `<div class="duel-card"><h3>${heading}</h3><p class="sub">This challenge has expired.</p></div>`;
+    if (d === undefined) return `<div class="duel-card"><h3>${heading}</h3><p class="sub">Couldn't load.</p></div>`;
+    const rows = [{ name: d.name, time_ms: d.time_ms, bumps: d.bumps, owner: true }, ...d.results]
+      .sort((a, b) => duelScore(a) - duelScore(b));
+    const items = rows.map((r, n) => {
+      const me = (x.role === 'sent' && r.owner) || (x.role === 'received' && !r.owner && r.name === save.name);
+      return `<li class="${me ? 'me' : ''}"><span>${n === 0 ? '🏆 ' : ''}${me ? 'You' : escapeHtml(r.name)}</span><span>${describe(r)}</span></li>`;
+    }).join('');
+    const nobody = x.role === 'sent' && !d.results.length ? '<p class="sub">No one has played it yet.</p>' : '';
+    const action = x.role === 'sent'
+      ? `<button class="btn secondary" data-share="${i}">Share again</button>`
+      : `<button class="btn" data-play="${i}">Play</button>`;
+    return `<div class="duel-card"><h3>${heading}</h3>${nobody}<ol>${items}</ol><div class="actions">${action}</div></div>`;
+  }).join('');
+  renderDuels.loaded = loaded;
 }
 
 // A perfect-run challenge was bumped: start it over.
@@ -466,16 +664,40 @@ function init() {
   for (const b of document.querySelectorAll('[data-back]')) {
     b.addEventListener('click', () => { play('click'); history.back(); });
   }
-  on('restart-btn', 'click', () => { play('click'); startLevel(currentLevel); });
+  on('restart-btn', 'click', () => { play('click'); startLevel(currentLevel, { duel }); });
   on('hint-btn', 'click', () => { play('click'); game.hint(); });
   on('next-btn', 'click', () => { play('click'); go('game', { level: currentLevel + 1 }, true); });
   on('win-menu-btn', 'click', () => { play('click'); history.back(); });
-  on('retry-btn', 'click', () => { play('click'); startLevel(currentLevel, { retry: true }); });
+  on('retry-btn', 'click', () => { play('click'); startLevel(currentLevel, { retry: true, duel }); });
+  on('challenge-btn', 'click', () => { play('click'); if (lastResult) sendChallenge(lastResult); });
+  on('duels-btn', 'click', () => { play('click'); go('duels'); });
+  on('duel-accept', 'click', () => { play('click'); if (pendingDuel) acceptDuel(pendingDuel); });
+  on('duel-decline', 'click', () => { play('click'); $('duel-modal').classList.add('hidden'); });
+  on('name-form', 'submit', (e) => {
+    e.preventDefault();
+    const name = $('nick-input').value.trim();
+    const problem = nameProblem(name);
+    $('nick-error').textContent = problem;
+    if (problem) return;
+    play('click');
+    save.name = name;
+    store.save(save);
+    submitScore();
+    ensureNickname.done?.(name);
+  });
+  on('nick-cancel', 'click', () => { play('click'); ensureNickname.done?.(null); });
+  on('duels-list', 'click', (e) => {
+    const share = e.target.closest('[data-share]');
+    const playBtn = e.target.closest('[data-play]');
+    const loaded = renderDuels.loaded || [];
+    if (share && loaded[share.dataset.share]) { play('click'); shareDuel(loaded[share.dataset.share]); }
+    if (playBtn && loaded[playBtn.dataset.play]) { play('click'); acceptDuel(loaded[playBtn.dataset.play]); }
+  });
 
   // Keep the speed-challenge clock ticking on screen, and pause it while the
   // app is in the background.
   setInterval(() => {
-    if (current?.challenge === 'speed' && !$('hud').classList.contains('hidden')) updateGoal();
+    if ((duel || current?.challenge === 'speed') && !$('hud').classList.contains('hidden')) updateGoal();
   }, 250);
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) game.pauseClock();
@@ -504,8 +726,10 @@ function init() {
 
   if (location.search.includes('debug')) window.whoosh = { game, startLevel };
 
-  history.replaceState({ screen: 'home' }, '');
+  const duelCode = codeFromUrl(location.search);
+  history.replaceState({ screen: 'home' }, '', duelCode ? location.pathname : undefined);
   show('home');
+  if (duelCode) openDuel(duelCode);
   submitScore(); // catch up on any score earned while offline
   window.whooshReady = true;
 }

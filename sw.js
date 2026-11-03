@@ -8,7 +8,7 @@
 // VERSION is a fingerprint of the files below. Run `npm run stamp` after
 // changing any of them (`npm test` fails if you forget), so phones notice.
 
-const VERSION = '8431ea0cadba';
+const VERSION = 'fc5bdf1a4c97';
 const CACHE = `whoosh-blocks-${VERSION}`;
 const ASSETS = [
   './',
@@ -25,6 +25,7 @@ const ASSETS = [
   'js/leaderboard.js',
   'js/names.js',
   'js/confetti.js',
+  'js/duel.js',
   'vendor/three.module.min.js',
   'vendor/RoundedBoxGeometry.js',
   'icons/icon-192.png',

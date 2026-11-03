@@ -124,6 +124,120 @@ begin
 end;
 $$;
 
+-- ---------- Friend challenges ("duels") ----------
+-- A player shares a link to a level with their time and bumps; friends who
+-- open it play the same level and their results are stored against it.
+-- Lowest time + 5 seconds per bump wins. Challenges expire after 30 days.
+
+create table if not exists public.duels (
+  code text primary key,
+  creator uuid not null,
+  name text not null,
+  level int not null check (level between 1 and 10000000),
+  time_ms int not null check (time_ms between 0 and 86400000),
+  bumps int not null check (bumps between 0 and 100000),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.duel_results (
+  code text not null references public.duels (code) on delete cascade,
+  player uuid not null,
+  name text not null,
+  time_ms int not null check (time_ms between 0 and 86400000),
+  bumps int not null check (bumps between 0 and 100000),
+  created_at timestamptz not null default now(),
+  primary key (code, player)
+);
+
+alter table public.duels enable row level security;
+alter table public.duel_results enable row level security;
+
+-- A challenge and everyone's results, best first. Never includes player ids.
+create or replace function public.get_duel(p_code text)
+returns json
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select json_build_object(
+    'code', d.code, 'name', d.name, 'level', d.level, 'time_ms', d.time_ms, 'bumps', d.bumps,
+    'results', coalesce((
+      select json_agg(json_build_object('name', r.name, 'time_ms', r.time_ms, 'bumps', r.bumps)
+                      order by r.time_ms + 5000 * r.bumps, r.created_at)
+      from duel_results r where r.code = d.code), '[]'::json))
+  from duels d
+  where d.code = upper(p_code) and d.created_at > now() - interval '30 days';
+$$;
+
+create or replace function public.create_duel(p_secret uuid, p_name text, p_level int, p_time_ms int, p_bumps int)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_code text;
+begin
+  if not name_ok(p_name) then
+    raise exception 'name not allowed' using errcode = '22023';
+  end if;
+  if p_level < 1 or p_time_ms < 500 or p_bumps < 0 then
+    raise exception 'bad result' using errcode = '22023';
+  end if;
+  if (select count(*) from duels where creator = p_secret and created_at > now() - interval '1 day') >= 30 then
+    raise exception 'too many challenges today' using errcode = '22023';
+  end if;
+
+  delete from duels where created_at < now() - interval '30 days';
+  loop
+    v_code := upper(substr(md5(random()::text || clock_timestamp()::text), 1, 6));
+    exit when not exists (select 1 from duels where code = v_code);
+  end loop;
+  insert into duels (code, creator, name, level, time_ms, bumps)
+    values (v_code, p_secret, trim(p_name), p_level, p_time_ms, p_bumps);
+  return get_duel(v_code);
+end;
+$$;
+
+-- Record a friend's attempt, keeping their best. The creator's own replays
+-- aren't recorded, and each challenge keeps at most 100 players.
+create or replace function public.submit_duel_result(p_code text, p_secret uuid, p_name text, p_time_ms int, p_bumps int)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_code text := upper(p_code);
+begin
+  if not name_ok(p_name) then
+    raise exception 'name not allowed' using errcode = '22023';
+  end if;
+  if p_time_ms < 500 or p_bumps < 0 then
+    raise exception 'bad result' using errcode = '22023';
+  end if;
+  if get_duel(v_code) is null then
+    raise exception 'challenge not found' using errcode = '22023';
+  end if;
+
+  if not exists (select 1 from duels where code = v_code and creator = p_secret)
+     and (exists (select 1 from duel_results where code = v_code and player = p_secret)
+          or (select count(*) from duel_results where code = v_code) < 100) then
+    insert into duel_results (code, player, name, time_ms, bumps)
+      values (v_code, p_secret, trim(p_name), p_time_ms, p_bumps)
+    on conflict (code, player) do update set
+      name = excluded.name,
+      time_ms = case when excluded.time_ms + 5000 * excluded.bumps < duel_results.time_ms + 5000 * duel_results.bumps
+                     then excluded.time_ms else duel_results.time_ms end,
+      bumps = case when excluded.time_ms + 5000 * excluded.bumps < duel_results.time_ms + 5000 * duel_results.bumps
+                   then excluded.bumps else duel_results.bumps end;
+  end if;
+  return get_duel(v_code);
+end;
+$$;
+
+-- "Remove me" also removes this player's challenges and results.
 create or replace function public.delete_score(p_secret uuid)
 returns void
 language sql
@@ -131,6 +245,8 @@ security definer
 set search_path = public
 as $$
   delete from scores where secret = p_secret;
+  delete from duels where creator = p_secret;
+  delete from duel_results where player = p_secret;
 $$;
 
 revoke all on function public.submit_score(uuid, text, int) from public;
@@ -139,3 +255,9 @@ revoke all on function public.delete_score(uuid) from public;
 grant execute on function public.submit_score(uuid, text, int) to anon;
 grant execute on function public.report_name(uuid, text) to anon;
 grant execute on function public.delete_score(uuid) to anon;
+revoke all on function public.get_duel(text) from public;
+revoke all on function public.create_duel(uuid, text, int, int, int) from public;
+revoke all on function public.submit_duel_result(text, uuid, text, int, int) from public;
+grant execute on function public.get_duel(text) to anon;
+grant execute on function public.create_duel(uuid, text, int, int, int) to anon;
+grant execute on function public.submit_duel_result(text, uuid, text, int, int) to anon;

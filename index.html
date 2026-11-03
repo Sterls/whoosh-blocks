@@ -57,6 +57,7 @@
     <button id="play-btn" class="btn big">Play</button>
     <button id="levels-btn" class="btn secondary">Levels</button>
     <button id="board-btn" class="btn secondary">Leaderboard</button>
+    <button id="duels-btn" class="btn secondary">⚔️ Challenges</button>
     <button id="settings-btn" class="btn ghost">Settings</button>
   </section>
 
@@ -99,6 +100,19 @@
     </footer>
   </section>
 
+  <!-- Friend challenges -->
+  <section id="duels" class="screen hidden">
+    <header class="bar">
+      <button class="icon-btn" data-back aria-label="Back">
+        <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <h2>Challenges</h2>
+      <span class="bar-spacer"></span>
+    </header>
+    <p id="duels-status" class="board-status"></p>
+    <div id="duels-list" class="duels-list"></div>
+  </section>
+
   <!-- In-game controls -->
   <section id="hud" class="hidden">
     <header class="bar">
@@ -135,6 +149,7 @@
       <p id="win-streak" class="win-streak hidden"></p>
       <button id="next-btn" class="btn big">Next level</button>
       <button id="retry-btn" class="btn secondary hidden">Try again for the trophy</button>
+      <button id="challenge-btn" class="btn secondary hidden">⚔️ Challenge a friend</button>
       <button id="win-menu-btn" class="btn ghost">Menu</button>
     </div>
   </div>
@@ -149,6 +164,31 @@
       <button id="settings-close" class="btn">Done</button>
       <a class="link-btn" href="privacy.html">Privacy policy &amp; licences</a>
     </div>
+  </div>
+
+  <!-- Someone's challenge, opened from a link -->
+  <div id="duel-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="duel-title">
+    <div class="card">
+      <div class="trophy" aria-hidden="true">⚔️</div>
+      <h2 id="duel-title"></h2>
+      <p id="duel-text"></p>
+      <p class="win-stats">Time + 5 seconds per bump. Lowest wins!</p>
+      <button id="duel-accept" class="btn big">Accept</button>
+      <button id="duel-decline" class="btn ghost">Not now</button>
+    </div>
+  </div>
+
+  <!-- Nickname, asked for the first time it's needed -->
+  <div id="name-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="name-title">
+    <form id="name-form" class="card">
+      <h2 id="name-title">Pick a nickname</h2>
+      <p id="name-reason"></p>
+      <input id="nick-input" class="nick-input" maxlength="20" autocomplete="nickname" placeholder="A nickname" required>
+      <p class="board-note">Also shown on the leaderboard. Please don't use your real name.</p>
+      <p id="nick-error" class="name-error" role="alert"></p>
+      <button class="btn" type="submit">Save</button>
+      <button id="nick-cancel" class="btn ghost" type="button">Cancel</button>
+    </form>
   </div>
 
   <div id="update-bar" class="update-bar hidden" role="status">
