@@ -8,6 +8,8 @@ import * as board from './leaderboard.js';
 import { nameProblem } from './names.js';
 import { confetti } from './confetti.js';
 import { duelScore, formatMs, describe, outcome, codeFromUrl, duelLink } from './duel.js';
+import { MAX_PLAYERS, newRoomCode, roomFromUrl, pickLevels, totalCubes, standings } from './race.js';
+import { joinRoom } from './race-net.js';
 
 const $ = (id) => document.getElementById(id);
 // Wire a control if it exists, so one missing element can't stop the others working.
@@ -66,7 +68,13 @@ const LOCK_SVG = '<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height=
 // ---------- screens ----------
 
 function show(screen) {
-  for (const id of ['home', 'levels', 'board', 'duels', 'hud', 'win', 'settings', 'duel-modal', 'name-modal']) $(id)?.classList.add('hidden');
+  for (const id of ['home', 'levels', 'board', 'duels', 'race', 'hud', 'win', 'settings', 'duel-modal', 'name-modal']) $(id)?.classList.add('hidden');
+  const racing = Boolean(race?.playing) && screen === 'game';
+  $('race-board').classList.toggle('hidden', !racing);
+  $('race-cheers').classList.toggle('hidden', !racing);
+  $('hud-mistakes').classList.toggle('hidden', racing);
+  $('restart-btn').style.visibility = racing ? 'hidden' : ''; // restarting would drop you out of the race
+  $('hud').classList.toggle('racing', racing);
   game?.setActive(screen === 'game');
   // Offer updates from the menus, never in the middle of a level.
   $('update-bar').classList.toggle('hidden', !waitingWorker || screen === 'game');
@@ -78,12 +86,17 @@ function show(screen) {
     $('trophy-count').classList.toggle('hidden', trophies === 0);
     $('board-btn').classList.toggle('hidden', !board.isConfigured());
     $('duels-btn').classList.toggle('hidden', !board.isConfigured());
+    $('race-btn').classList.toggle('hidden', !board.isConfigured());
   } else if (screen === 'levels') {
     renderLevelGrid();
     $('levels').classList.remove('hidden');
   } else if (screen === 'board') {
     $('board').classList.remove('hidden');
     renderBoard();
+  } else if (screen === 'race') {
+    $('race').classList.remove('hidden');
+    $('race-status').textContent = '';
+    renderRaceScreen();
   } else if (screen === 'duels') {
     $('duels').classList.remove('hidden');
     renderDuels();
@@ -101,6 +114,19 @@ function go(screen, data = {}, replace = false) {
 
 function route(state) {
   const screen = state?.screen || 'home';
+  if (race) {
+    const midRace = race.playing && !race.finished;
+    if (midRace && screen !== 'race-game') {
+      if (!confirm('Leave the race?')) {
+        history.pushState({ screen: 'race-game' }, '');
+        return;
+      }
+      leaveRace();
+    } else if (!midRace && screen !== 'race' && screen !== 'race-game') {
+      leaveRace();
+    }
+  }
+  if (screen === 'race-game') return;
   if (screen === 'game') startLevel(state.level || save.unlocked, { duel: state.duel });
   else show(screen);
   if (state?.modal === 'settings') openSettings();
@@ -290,6 +316,7 @@ function startLevel(n, { retry = false, duel: d = null } = {}) {
 
 function updateGoal() {
   const goal = $('hud-goal');
+  if (race?.playing) return goal.classList.add('hidden');
   if (duel) {
     const mine = { time_ms: game.elapsed * 1000, bumps: game.mistakes };
     goal.classList.remove('hidden');
@@ -366,7 +393,9 @@ function onCubeRemoved(remaining) {
   lastPop = now;
   play('pop', combo++);
   vibrate(8);
-  if (remaining === 0) {
+  if (remaining === 0 && race?.playing && race.idx + 1 < race.levels.length) {
+    play('star', 2); // a level of the race done; the big finish is saved for the end
+  } else if (remaining === 0) {
     play('finale');
     vibrate([15, 40, 15, 40, 30]);
     confetti(levelColors());
@@ -380,6 +409,7 @@ function levelColors() {
 }
 
 function onWin(mistakes) {
+  if (race?.playing) return raceLevelDone();
   if (duel) return onDuelWin(mistakes);
   const stars = starsFor(mistakes);
   const result = challengeResult(current);
@@ -608,6 +638,237 @@ async function renderDuels() {
   renderDuels.loaded = loaded;
 }
 
+// ---------- live races ----------
+
+let race = null;
+// { code, room, me, players, hostId, round, levels, total, idx, cleared, bumps,
+//   startedAt, playing, finished, progress: Map(id -> { id, name, cleared, bumps, time_ms, gone }) }
+const raceSettings = { count: 3, difficulty: 'easy' };
+const randomId = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
+const ordinal = (n) => n + (['th', 'st', 'nd', 'rd'][(n % 100 - 20) % 10] || ['th', 'st', 'nd', 'rd'][n % 100] || 'th');
+
+// Tests can give each tab its own racer name.
+function raceName(reason) {
+  const debugName = location.search.includes('debug') && new URLSearchParams(location.search).get('racename');
+  return debugName ? Promise.resolve(debugName) : ensureNickname(reason);
+}
+
+function renderRaceScreen() {
+  const inRoom = Boolean(race?.room);
+  $('race-entry').classList.toggle('hidden', inRoom);
+  $('race-lobby').classList.toggle('hidden', !inRoom);
+  if (!inRoom) return;
+  $('race-code').textContent = race.code;
+  const isHost = race.hostId === race.me.id;
+  $('race-players').innerHTML = race.players.map((p) =>
+    `<li class="${p.id === race.me.id ? 'me' : ''}">${p.id === race.hostId ? '👑 ' : ''}${escapeHtml(p.name)}</li>`).join('');
+  $('race-settings').classList.toggle('hidden', !isHost);
+  const host = race.players.find((p) => p.id === race.hostId);
+  $('race-wait').textContent = isHost
+    ? (race.players.length < 2 ? 'Invite at least one friend to start.' : `${race.players.length} of ${MAX_PLAYERS} players`)
+    : `Waiting for ${host ? host.name : 'the host'} to start…`;
+  $('race-start').disabled = race.players.length < 2;
+  for (const b of document.querySelectorAll('#race-count button')) b.classList.toggle('on', Number(b.dataset.count) === raceSettings.count);
+  for (const b of document.querySelectorAll('#race-difficulty button')) b.classList.toggle('on', b.dataset.diff === raceSettings.difficulty);
+}
+
+async function enterRace(code, asHost) {
+  const name = await raceName('So the other racers know who you are.');
+  if (!name) return;
+  $('race-status').textContent = 'Connecting…';
+  race = { code, me: { id: randomId(), name, host: asHost }, players: [], hostId: null, round: 0, progress: new Map() };
+  try {
+    const room = await joinRoom(code, race.me, { onPlayers: onRacePlayers, onMessage: onRaceMessage });
+    if (!race || race.code !== code) return room.leave(); // left while connecting
+    race.room = room;
+    $('race-status').textContent = '';
+    history.replaceState({ screen: 'race' }, '');
+    renderRaceScreen();
+  } catch (err) {
+    race = null;
+    $('race-status').textContent = `Couldn't connect to the race. Check your internet and try again. (${err.message})`;
+  }
+}
+
+function onRacePlayers(list) {
+  if (!race) return;
+  const players = [...list].sort((a, b) => a.joinedAt - b.joinedAt);
+  const myIndex = players.findIndex((p) => p.id === race.me.id);
+  if (myIndex >= MAX_PLAYERS) {
+    leaveRace();
+    showToast(`That race is full (${MAX_PLAYERS} players).`);
+    return;
+  }
+  race.players = players.slice(0, MAX_PLAYERS);
+  race.hostId = (race.players.find((p) => p.host) || race.players[0])?.id;
+  // Anyone who disappears mid-race is marked as gone.
+  for (const [id, p] of race.progress) if (!race.players.some((x) => x.id === id) && p.time_ms == null) p.gone = true;
+  renderRaceScreen();
+  if (race.playing) renderRaceBoard();
+  if (!$('race-results').classList.contains('hidden')) renderRaceResults();
+}
+
+function onRaceMessage(type, data, from) {
+  if (!race) return;
+  if (type === 'start') {
+    if (data.round > race.round) beginRound(data);
+    return;
+  }
+  if (data.round !== race.round) return;
+  const p = race.progress.get(from) || { id: from, name: race.players.find((x) => x.id === from)?.name || '?' };
+  if (type === 'progress') Object.assign(p, { cleared: data.cleared, bumps: data.bumps });
+  if (type === 'finish') Object.assign(p, { cleared: race.total, time_ms: data.time_ms, bumps: data.bumps });
+  if (type === 'quit') p.gone = true;
+  race.progress.set(from, p);
+  if (type === 'cheer') showCheer(p.name, data.emoji);
+  renderRaceBoard();
+  if (!$('race-results').classList.contains('hidden')) renderRaceResults();
+}
+
+function startRace() {
+  if (!race?.room || race.hostId !== race.me.id || race.players.length < 2) return;
+  const data = { round: race.round + 1, levels: pickLevels(raceSettings.difficulty, raceSettings.count) };
+  race.room.send('start', data);
+  beginRound(data);
+}
+
+function beginRound({ round, levels }) {
+  Object.assign(race, {
+    round, levels, total: totalCubes(levels), idx: 0, cleared: 0, bumps: 0,
+    playing: true, finished: false, startedAt: null,
+    progress: new Map(race.players.map((p) => [p.id, { id: p.id, name: p.name, cleared: 0, bumps: 0 }])),
+  });
+  duel = null;
+  $('race-results').classList.add('hidden');
+  history.pushState({ screen: 'race-game' }, '');
+  show('game');
+  // Everyone sees the first puzzle during the countdown, but can't tap it yet.
+  startRaceLevel(0);
+  game.won = true;
+  $('hud-left').textContent = 'Get ready…';
+  renderRaceBoard();
+  let n = 3;
+  const tick = () => {
+    if (!race || race.round !== round) return;
+    $('countdown').classList.remove('hidden');
+    $('countdown').innerHTML = `<span>${n > 0 ? n : 'Go!'}</span>`;
+    play('star', n > 0 ? 0 : 3);
+    if (n-- > 0) return void setTimeout(tick, 800);
+    setTimeout(() => $('countdown').classList.add('hidden'), 500);
+    race.startedAt = performance.now();
+    game.won = false;
+    updateLeft();
+  };
+  tick();
+}
+
+function startRaceLevel(i) {
+  race.idx = i;
+  current = { ...getLevel(race.levels[i]) };
+  delete current.challenge;
+  game.load(current);
+  $('hud-level').textContent = `Race · Level ${i + 1} of ${race.levels.length}`;
+  updateLeft();
+  updateMistakes(race.bumps);
+}
+
+let progressTimer = null;
+function sendProgress() {
+  const mine = race.progress.get(race.me.id);
+  Object.assign(mine, { cleared: race.cleared, bumps: race.bumps });
+  renderRaceBoard();
+  if (progressTimer) return; // at most a few updates a second
+  progressTimer = setTimeout(() => {
+    progressTimer = null;
+    if (race?.playing) race.room.send('progress', { round: race.round, cleared: race.cleared, bumps: race.bumps });
+  }, 250);
+}
+
+function raceLevelDone() {
+  if (race.idx + 1 < race.levels.length) {
+    showHelp(`<b>Level ${race.idx + 2} of ${race.levels.length}</b>`, 1.2);
+    setTimeout(() => { if (race?.playing && !race.finished) startRaceLevel(race.idx + 1); }, 700);
+    return;
+  }
+  race.finished = true;
+  const time_ms = Math.round(performance.now() - race.startedAt);
+  Object.assign(race.progress.get(race.me.id), { cleared: race.total, time_ms, bumps: race.bumps });
+  race.room.send('finish', { round: race.round, time_ms, bumps: race.bumps });
+  play('win');
+  renderRaceResults();
+  $('race-results').classList.remove('hidden');
+  const first = standings([...race.progress.values()])[0];
+  if (first.id === race.me.id) confetti(levelColors(), { count: 160, duration: 3200 });
+}
+
+function renderRaceBoard() {
+  if (!race?.playing) return;
+  const rows = standings([...race.progress.values()]);
+  $('race-board').innerHTML = rows.map((p, i) => {
+    const pct = Math.min(100, Math.round(((p.cleared || 0) / race.total) * 100));
+    const val = p.time_ms != null ? formatMs(duelScore(p)) : p.gone ? 'left' : `${pct}%`;
+    return `<li class="${p.id === race.me.id ? 'me' : ''} ${p.gone ? 'gone' : ''}"><span>${i + 1}</span><span class="who">${escapeHtml(p.name)}</span><span class="track"><i style="width:${pct}%"></i></span><span class="val">${val}</span></li>`;
+  }).join('');
+}
+
+function renderRaceResults() {
+  const rows = standings([...race.progress.values()]);
+  const stillRacing = rows.some((p) => p.time_ms == null && !p.gone);
+  const myPlace = rows.findIndex((p) => p.id === race.me.id) + 1;
+  $('race-results-icon').textContent = myPlace === 1 ? '🏆' : '🏁';
+  $('race-results-title').textContent = stillRacing
+    ? (myPlace === 1 ? "You're in the lead!" : `You're ${ordinal(myPlace)} so far`)
+    : (myPlace === 1 ? 'You win! 🎉' : `You came ${ordinal(myPlace)}`);
+  $('race-results-list').innerHTML = rows.map((p, i) => {
+    const val = p.time_ms != null ? describe(p) : p.gone ? 'left' : `racing… ${Math.round(((p.cleared || 0) / race.total) * 100)}%`;
+    return `<li class="${p.id === race.me.id ? 'me' : ''} ${p.gone ? 'gone' : ''}"><span>${i + 1}. ${escapeHtml(p.name)}</span><span>${val}</span></li>`;
+  }).join('');
+  const isHost = race.hostId === race.me.id;
+  $('race-rematch').classList.toggle('hidden', !isHost);
+  const host = race.players.find((p) => p.id === race.hostId);
+  $('race-results-wait').textContent = isHost ? '' : `Waiting for ${host ? host.name : 'the host'} to start a rematch…`;
+}
+
+let lastCheer = 0;
+function sendCheer(emoji) {
+  if (!race?.playing || performance.now() - lastCheer < 1000) return;
+  lastCheer = performance.now();
+  race.room.send('cheer', { round: race.round, emoji });
+  showCheer('You', emoji);
+}
+
+function showCheer(name, emoji) {
+  const el = document.createElement('div');
+  el.className = 'cheer';
+  el.textContent = `${name} ${emoji}`;
+  el.style.left = `${10 + Math.random() * 55}%`;
+  $('cheer-layer').appendChild(el);
+  setTimeout(() => el.remove(), 2500);
+}
+
+function leaveRace() {
+  if (!race) return;
+  if (race.playing && !race.finished) race.room?.send('quit', { round: race.round });
+  race.room?.leave();
+  race = null;
+  $('race-results').classList.add('hidden');
+  $('countdown').classList.add('hidden');
+}
+
+async function shareRace() {
+  const url = `${location.origin}${location.pathname}?race=${race.code}`;
+  const text = `Race me in Whoosh Blocks! Room code ${race.code}`;
+  if (navigator.share) {
+    try { await navigator.share({ title: 'Whoosh Blocks race', text, url }); return; } catch (err) { if (err.name === 'AbortError') return; }
+  }
+  try {
+    await navigator.clipboard.writeText(`${text} ${url}`);
+    showToast('Invite link copied. Paste it in a message to your friends!');
+  } catch {
+    prompt('Copy this link and send it to your friends:', url);
+  }
+}
+
 // A perfect-run challenge was bumped: start it over.
 function onFail() {
   showHelp('<b>Bump!</b><br>Starting over…');
@@ -637,13 +898,17 @@ function init() {
       onRemove: (remaining) => {
         onCubeRemoved(remaining);
         updateLeft();
+        if (race?.playing && !race.finished) { race.cleared++; sendProgress(); }
         if (!save.seenHelp) {
           save.seenHelp = true;
           store.save(save);
           hideHelp();
         }
       },
-      onBump: () => { combo = 0; play('bump'); vibrate(35); },
+      onBump: () => {
+        combo = 0; play('bump'); vibrate(35);
+        if (race?.playing && !race.finished) { race.bumps++; sendProgress(); }
+      },
       onMistake: updateMistakes,
       onTap: () => {
         updateGoal();
@@ -685,6 +950,22 @@ function init() {
   on('retry-btn', 'click', () => { play('click'); startLevel(currentLevel, { retry: true, duel }); });
   on('challenge-btn', 'click', () => { play('click'); if (lastResult) sendChallenge(lastResult); });
   on('duels-btn', 'click', () => { play('click'); go('duels'); });
+  on('race-btn', 'click', () => { play('click'); go('race'); });
+  on('race-create', 'click', () => { play('click'); enterRace(newRoomCode(), true); });
+  on('race-join-form', 'submit', (e) => {
+    e.preventDefault();
+    const code = $('race-code-input').value.trim().toUpperCase();
+    if (!/^[A-Z0-9]{5}$/.test(code)) { $('race-status').textContent = 'Room codes are 5 letters and numbers.'; return; }
+    play('click');
+    enterRace(code, false);
+  });
+  on('race-share', 'click', () => { play('click'); shareRace(); });
+  on('race-start', 'click', () => { play('click'); startRace(); });
+  on('race-rematch', 'click', () => { play('click'); startRace(); });
+  on('race-leave', 'click', () => { play('click'); leaveRace(); go('home', {}, true); });
+  on('race-count', 'click', (e) => { const b = e.target.closest('[data-count]'); if (b) { raceSettings.count = Number(b.dataset.count); renderRaceScreen(); } });
+  on('race-difficulty', 'click', (e) => { const b = e.target.closest('[data-diff]'); if (b) { raceSettings.difficulty = b.dataset.diff; renderRaceScreen(); } });
+  on('race-cheers', 'click', (e) => { const b = e.target.closest('[data-cheer]'); if (b) sendCheer(b.dataset.cheer); });
   on('duel-accept', 'click', () => { play('click'); if (pendingDuel) acceptDuel(pendingDuel); });
   on('duel-decline', 'click', () => { play('click'); $('duel-modal').classList.add('hidden'); });
   on('name-form', 'submit', (e) => {
@@ -743,9 +1024,12 @@ function init() {
   if (location.search.includes('debug')) window.whoosh = { game, startLevel };
 
   const duelCode = codeFromUrl(location.search);
-  history.replaceState({ screen: 'home' }, '', duelCode ? location.pathname : undefined);
+  const raceCode = roomFromUrl(location.search);
+  const cleanUrl = location.pathname + (location.search.includes('debug') ? `?${new URLSearchParams(location.search).toString().replace(/(^|&)(c|race)=[^&]*/g, '')}` : '');
+  history.replaceState({ screen: 'home' }, '', duelCode || raceCode ? cleanUrl : undefined);
   show('home');
   if (duelCode) openDuel(duelCode);
+  if (raceCode && board.isConfigured()) { go('race'); enterRace(raceCode, false); }
   submitScore(); // catch up on any score earned while offline
   window.whooshReady = true;
 }

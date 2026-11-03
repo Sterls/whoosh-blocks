@@ -62,6 +62,12 @@ What the database enforces:
 - **Friend challenges** ("Challenge a friend" on the win card): stored with a
   6-character code, shared as a link (`…/whoosh-blocks/?c=CODE`), and deleted
   after 30 days. Each player can send up to 30 a day.
+- **Live races** ("Race friends"): up to 8 players race the same 3 or 5 levels
+  through a room code, using Supabase **Realtime** (broadcast + presence).
+  Nothing is stored. If races won't connect, check **Project Settings →
+  Realtime** and make sure public channels are allowed (not "private channels
+  only"). Add `?debug&localrace&racename=Name` to the address to test races
+  between browser tabs without Supabase.
 - The public can read only nicknames and levels, never the players' secret ids.
 
 **Moderating:** in Supabase, open **Table Editor → scores**. Tick **hidden** to

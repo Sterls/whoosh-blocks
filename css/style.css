@@ -164,6 +164,58 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .nick-input:focus { border-color: var(--accent); }
 #win-text { white-space: pre-line; }
 
+/* ---------- live race ---------- */
+
+.race-panel { display: flex; flex-direction: column; align-items: center; gap: 14px; margin-top: 18px; text-align: center; }
+.race-intro { margin: 0 8px 6px; font-size: 17px; color: var(--ink-soft); line-height: 1.45; }
+.race-join { width: 100%; max-width: 360px; margin-top: 18px; display: flex; flex-direction: column; gap: 8px; font-size: 16px; font-weight: 600; color: var(--ink-soft); }
+.race-join-row { display: flex; gap: 8px; }
+.race-join-row input {
+  flex: 1; min-width: 0; font: inherit; font-size: 24px; font-weight: 800; letter-spacing: 4px; text-transform: uppercase; text-align: center;
+  padding: 10px; border-radius: 14px; border: 2px solid #d6d1ff; outline: none; color: var(--ink);
+  user-select: text; -webkit-user-select: text;
+}
+.race-join-row .btn { min-width: 0; padding: 10px 20px; }
+.race-code-label { margin: 0; font-size: 15px; color: var(--ink-soft); }
+.race-code { margin: -10px 0 0; font-size: 44px; font-weight: 800; letter-spacing: 8px; color: var(--accent); user-select: text; -webkit-user-select: text; }
+.race-players { list-style: none; margin: 0; padding: 0; width: 100%; max-width: 380px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.race-players li { background: #fff; border-radius: 14px; padding: 10px 12px; font-size: 16px; font-weight: 600; box-shadow: 0 3px 0 #e6e3f5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.race-players li.me { background: #f0eeff; }
+.race-settings { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+.seg { display: inline-flex; background: #fff; border-radius: 14px; padding: 4px; box-shadow: 0 3px 0 #e6e3f5; }
+.seg button { border: 0; background: none; padding: 8px 14px; border-radius: 10px; font-size: 16px; font-weight: 700; color: var(--ink-soft); }
+.seg button.on { background: var(--accent); color: #fff; }
+
+.race-board {
+  position: absolute; left: 16px; right: 16px; top: calc(78px + var(--safe-top));
+  list-style: none; margin: 0 auto; padding: 8px 10px; max-width: 420px;
+  background: rgba(255, 255, 255, 0.85); border-radius: 16px; box-shadow: 0 3px 10px rgba(43, 42, 74, 0.1);
+  display: flex; flex-direction: column; gap: 3px; font-size: 13px; pointer-events: none;
+}
+.race-board li { display: grid; grid-template-columns: 18px 76px 1fr 54px; align-items: center; gap: 6px; }
+.race-board li.me { font-weight: 800; color: var(--accent); }
+.race-board li.gone { opacity: 0.45; }
+.race-board .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.race-board .track { height: 8px; border-radius: 4px; background: #e6e3f5; overflow: hidden; }
+.race-board .track i { display: block; height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.3s; }
+.race-board .val { text-align: right; font-variant-numeric: tabular-nums; }
+#hud.racing .help { top: calc(300px + var(--safe-top)); }
+.race-cheers { display: flex; gap: 4px; pointer-events: auto; }
+.race-cheers button { width: 44px; height: 44px; border: 0; border-radius: 14px; background: rgba(255, 255, 255, 0.85); font-size: 22px; box-shadow: 0 3px 10px rgba(43, 42, 74, 0.1); }
+.race-cheers button:active { transform: scale(0.9); }
+.cheer-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.cheer { position: absolute; bottom: 120px; font-size: 18px; font-weight: 700; color: var(--ink); background: rgba(255, 255, 255, 0.9); padding: 6px 12px; border-radius: 999px; animation: cheer-up 2.4s ease-out forwards; }
+@keyframes cheer-up { from { transform: translateY(0); opacity: 0; } 10% { opacity: 1; } to { transform: translateY(-260px); opacity: 0; } }
+.countdown {
+  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; pointer-events: none;
+  font-size: 140px; font-weight: 900; color: var(--accent); text-shadow: 0 8px 30px rgba(108, 99, 255, 0.35);
+}
+.countdown span { animation: pop-in 0.5s cubic-bezier(.2, 1.6, .5, 1); }
+.race-results-list { list-style: none; margin: 0 0 6px; padding: 0; width: 100%; font-size: 16px; }
+.race-results-list li { display: flex; justify-content: space-between; gap: 10px; padding: 6px 4px; border-top: 1px solid #f0eef8; }
+.race-results-list li.me { font-weight: 800; color: var(--accent); }
+.race-results-list li.gone { opacity: 0.5; }
+
 /* ---------- update bar ---------- */
 
 .update-bar {

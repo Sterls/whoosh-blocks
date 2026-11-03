@@ -58,6 +58,7 @@
     <button id="levels-btn" class="btn secondary">Levels</button>
     <button id="board-btn" class="btn secondary">Leaderboard</button>
     <button id="duels-btn" class="btn secondary">⚔️ Challenges</button>
+    <button id="race-btn" class="btn secondary">🏁 Race friends</button>
     <button id="settings-btn" class="btn ghost">Settings</button>
   </section>
 
@@ -113,6 +114,45 @@
     <div id="duels-list" class="duels-list"></div>
   </section>
 
+  <!-- Live race: create or join, then the waiting room -->
+  <section id="race" class="screen hidden">
+    <header class="bar">
+      <button class="icon-btn" data-back aria-label="Back">
+        <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <h2>Race friends</h2>
+      <span class="bar-spacer"></span>
+    </header>
+    <div id="race-entry" class="race-panel">
+      <p class="race-intro">Race up to 7 friends through the same levels, live. Lowest total time wins (+5 seconds per bump).</p>
+      <button id="race-create" class="btn big">Create a race</button>
+      <form id="race-join-form" class="race-join">
+        <label for="race-code-input">Or join with a code</label>
+        <div class="race-join-row">
+          <input id="race-code-input" maxlength="5" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="ABCDE">
+          <button class="btn" type="submit">Join</button>
+        </div>
+      </form>
+    </div>
+    <div id="race-lobby" class="race-panel hidden">
+      <p class="race-code-label">Room code</p>
+      <p id="race-code" class="race-code"></p>
+      <button id="race-share" class="btn secondary">Invite friends</button>
+      <ol id="race-players" class="race-players"></ol>
+      <div id="race-settings" class="race-settings">
+        <div class="seg" id="race-count" role="group" aria-label="Number of levels">
+          <button type="button" data-count="3" class="on">3 levels</button><button type="button" data-count="5">5 levels</button>
+        </div>
+        <div class="seg" id="race-difficulty" role="group" aria-label="Difficulty">
+          <button type="button" data-diff="easy" class="on">Easy</button><button type="button" data-diff="medium">Medium</button><button type="button" data-diff="hard">Hard</button>
+        </div>
+        <button id="race-start" class="btn big">Start race</button>
+      </div>
+      <p id="race-wait" class="board-status"></p>
+    </div>
+    <p id="race-status" class="board-status"></p>
+  </section>
+
   <!-- In-game controls -->
   <section id="hud" class="hidden">
     <header class="bar">
@@ -128,9 +168,14 @@
       </button>
     </header>
     <div id="hud-goal" class="goal hidden" aria-live="polite"></div>
+    <ol id="race-board" class="race-board hidden" aria-label="Race standings"></ol>
+    <div id="cheer-layer" class="cheer-layer" aria-live="polite"></div>
     <div id="help" class="help hidden"></div>
     <footer class="hud-bottom">
       <div id="hud-mistakes" class="mistakes" aria-live="polite"></div>
+      <div id="race-cheers" class="race-cheers hidden" role="group" aria-label="Send a cheer">
+        <button type="button" data-cheer="👏">👏</button><button type="button" data-cheer="🔥">🔥</button><button type="button" data-cheer="😮">😮</button><button type="button" data-cheer="😂">😂</button>
+      </div>
       <button id="hint-btn" class="btn hint">
         <svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>
         Hint
@@ -163,6 +208,20 @@
       <button id="reset-btn" class="btn ghost danger">Reset progress</button>
       <button id="settings-close" class="btn">Done</button>
       <a class="link-btn" href="privacy.html">Privacy policy &amp; licences</a>
+    </div>
+  </div>
+
+  <div id="countdown" class="countdown hidden" aria-live="assertive"></div>
+
+  <!-- Live race results -->
+  <div id="race-results" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="race-results-title">
+    <div class="card">
+      <div id="race-results-icon" class="trophy" aria-hidden="true">🏁</div>
+      <h2 id="race-results-title"></h2>
+      <ol id="race-results-list" class="race-results-list"></ol>
+      <button id="race-rematch" class="btn big">Rematch</button>
+      <p id="race-results-wait" class="win-stats"></p>
+      <button id="race-leave" class="btn ghost">Leave race</button>
     </div>
   </div>
 
