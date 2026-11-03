@@ -149,6 +149,7 @@
         <button id="race-start" class="btn big">Start race</button>
       </div>
       <p id="race-wait" class="board-status"></p>
+      <div class="race-cheers" role="group" aria-label="Send a cheer"><button type="button" data-cheer="👏">👏</button><button type="button" data-cheer="🔥">🔥</button><button type="button" data-cheer="😮">😮</button><button type="button" data-cheer="😂">😂</button></div>
     </div>
     <p id="race-status" class="board-status"></p>
   </section>
@@ -169,7 +170,6 @@
     </header>
     <div id="hud-goal" class="goal hidden" aria-live="polite"></div>
     <ol id="race-board" class="race-board hidden" aria-label="Race standings"></ol>
-    <div id="cheer-layer" class="cheer-layer" aria-live="polite"></div>
     <div id="help" class="help hidden"></div>
     <footer class="hud-bottom">
       <div id="hud-mistakes" class="mistakes" aria-live="polite"></div>
@@ -212,6 +212,7 @@
   </div>
 
   <div id="countdown" class="countdown hidden" aria-live="assertive"></div>
+  <div id="cheer-layer" class="cheer-layer" aria-live="polite"></div>
 
   <!-- Live race results -->
   <div id="race-results" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="race-results-title">
@@ -219,6 +220,7 @@
       <div id="race-results-icon" class="trophy" aria-hidden="true">🏁</div>
       <h2 id="race-results-title"></h2>
       <ol id="race-results-list" class="race-results-list"></ol>
+      <div class="race-cheers" role="group" aria-label="Send a cheer"><button type="button" data-cheer="👏">👏</button><button type="button" data-cheer="🔥">🔥</button><button type="button" data-cheer="😮">😮</button><button type="button" data-cheer="😂">😂</button></div>
       <button id="race-rematch" class="btn big">Rematch</button>
       <p id="race-results-wait" class="win-stats"></p>
       <button id="race-leave" class="btn ghost">Leave race</button>

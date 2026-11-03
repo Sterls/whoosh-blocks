@@ -714,13 +714,16 @@ function onRaceMessage(type, data, from) {
     if (data.round > race.round) beginRound(data);
     return;
   }
+  if (type === 'cheer') {
+    showCheer(race.players.find((x) => x.id === from)?.name || '?', data.emoji);
+    return;
+  }
   if (data.round !== race.round) return;
   const p = race.progress.get(from) || { id: from, name: race.players.find((x) => x.id === from)?.name || '?' };
   if (type === 'progress') Object.assign(p, { cleared: data.cleared, bumps: data.bumps });
   if (type === 'finish') Object.assign(p, { cleared: race.total, time_ms: data.time_ms, bumps: data.bumps });
   if (type === 'quit') p.gone = true;
   race.progress.set(from, p);
-  if (type === 'cheer') showCheer(p.name, data.emoji);
   renderRaceBoard();
   if (!$('race-results').classList.contains('hidden')) renderRaceResults();
 }
@@ -831,7 +834,9 @@ function renderRaceResults() {
 
 let lastCheer = 0;
 function sendCheer(emoji) {
-  if (!race?.playing || performance.now() - lastCheer < 1000) return;
+  // Allowed any time you're in a room (racing, finished and waiting, or in the
+  // waiting room), but no more than one every 0.7 seconds.
+  if (!race?.room || performance.now() - lastCheer < 700) return;
   lastCheer = performance.now();
   race.room.send('cheer', { round: race.round, emoji });
   showCheer('You', emoji);
@@ -965,7 +970,7 @@ function init() {
   on('race-leave', 'click', () => { play('click'); leaveRace(); go('home', {}, true); });
   on('race-count', 'click', (e) => { const b = e.target.closest('[data-count]'); if (b) { raceSettings.count = Number(b.dataset.count); renderRaceScreen(); } });
   on('race-difficulty', 'click', (e) => { const b = e.target.closest('[data-diff]'); if (b) { raceSettings.difficulty = b.dataset.diff; renderRaceScreen(); } });
-  on('race-cheers', 'click', (e) => { const b = e.target.closest('[data-cheer]'); if (b) sendCheer(b.dataset.cheer); });
+  document.addEventListener('click', (e) => { const b = e.target.closest('[data-cheer]'); if (b) sendCheer(b.dataset.cheer); });
   on('duel-accept', 'click', () => { play('click'); if (pendingDuel) acceptDuel(pendingDuel); });
   on('duel-decline', 'click', () => { play('click'); $('duel-modal').classList.add('hidden'); });
   on('name-form', 'submit', (e) => {
