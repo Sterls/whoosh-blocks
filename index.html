@@ -10,8 +10,35 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-180.png">
   <link rel="stylesheet" href="css/style.css">
-  <script type="importmap">
-    { "imports": { "three": "./vendor/three.module.min.js" } }
+  <script>
+    // If the game can't start (an old or unusual browser), say so instead of
+    // leaving buttons that do nothing, and show why so it can be reported.
+    (function () {
+      // After start-up, problems show as a small note instead (screenshot it to report).
+      function note(reason) {
+        var t = document.getElementById('toast');
+        if (!t) return;
+        t.textContent = 'Something went wrong: ' + reason;
+        t.classList.remove('hidden');
+        clearTimeout(note.timer);
+        note.timer = setTimeout(function () { t.classList.add('hidden'); }, 8000);
+      }
+      function fail(reason) {
+        if (window.whooshReady) return note(reason);
+        var box = document.getElementById('error');
+        if (!box) return document.addEventListener('DOMContentLoaded', function () { fail(reason); });
+        box.classList.remove('hidden');
+        document.getElementById('error-detail').textContent =
+          (reason ? reason + ' · ' : '') + navigator.userAgent;
+      }
+      window.addEventListener('error', function (e) {
+        var el = e.target;
+        if (el && el !== window && el.tagName !== 'SCRIPT') return; // e.g. an image: not fatal
+        fail(e.message || 'Script failed to load: ' + (el && el.src));
+      }, true);
+      window.addEventListener('unhandledrejection', function (e) { fail(String(e.reason)); });
+      setTimeout(function () { if (!window.whooshReady) fail('The game did not finish starting'); }, 10000);
+    })();
   </script>
 </head>
 <body>
@@ -129,8 +156,15 @@
     <button id="update-btn" class="btn">Update</button>
   </div>
 
-  <div id="error" class="hidden">
-    Sorry, this phone's browser couldn't start the 3D view.<br>Try opening it in Chrome.
+  <div id="toast" class="toast hidden" role="status"></div>
+
+  <div id="error" class="hidden" role="alert">
+    <div>
+      <p>Sorry, Whoosh Blocks couldn't start on this phone.</p>
+      <p>Please update <b>Google Chrome</b> and <b>Android System WebView</b> in the Play Store, then try again.</p>
+      <button class="btn" onclick="location.reload()">Try again</button>
+      <p id="error-detail" class="error-detail"></p>
+    </div>
   </div>
 
   <script type="module" src="js/main.js"></script>

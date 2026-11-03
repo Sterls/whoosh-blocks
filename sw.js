@@ -8,7 +8,7 @@
 // VERSION is a fingerprint of the files below. Run `npm run stamp` after
 // changing any of them (`npm test` fails if you forget), so phones notice.
 
-const VERSION = 'c75d46f5db4e';
+const VERSION = '8431ea0cadba';
 const CACHE = `whoosh-blocks-${VERSION}`;
 const ASSETS = [
   './',
@@ -32,9 +32,14 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
-  // Bypass the browser's HTTP cache so we get this version's files, not stale ones.
-  event.waitUntil(caches.open(CACHE).then((cache) =>
-    cache.addAll(ASSETS.map((url) => new Request(url, { cache: 'reload' })))));
+  // Fetch each file fresh (bypassing the browser cache) with this version in
+  // the query, so CDN caches can't hand back an older copy of one file mixed
+  // with newer copies of others.
+  event.waitUntil(caches.open(CACHE).then((cache) => Promise.all(ASSETS.map(async (url) => {
+    const res = await fetch(`${url}${url.includes('?') ? '&' : '?'}v=${VERSION}`, { cache: 'reload' });
+    if (!res.ok) throw new Error(`${url}: ${res.status}`);
+    await cache.put(url, res);
+  }))));
 });
 
 self.addEventListener('activate', (event) => {

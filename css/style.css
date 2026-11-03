@@ -275,6 +275,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .toggle input:checked + i::after { transform: translateX(24px); }
 
 #error {
-  position: fixed; inset: 0; display: grid; place-items: center; padding: 24px;
-  text-align: center; font-size: 20px; line-height: 1.5;
+  position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px;
+  text-align: center; font-size: 19px; line-height: 1.5;
+  background: linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
 }
+#error p { margin: 0 0 14px; }
+.toast {
+  position: fixed; left: 16px; right: 16px; bottom: calc(90px + var(--safe-bottom)); z-index: 90;
+  margin: 0 auto; max-width: 420px; padding: 10px 14px; border-radius: 14px;
+  background: var(--ink); color: #fff; font-size: 13px; line-height: 1.4; word-break: break-word;
+  user-select: text; -webkit-user-select: text;
+}
+.error-detail { margin-top: 18px !important; font-size: 12px; color: var(--ink-soft); word-break: break-word; user-select: text; -webkit-user-select: text; }

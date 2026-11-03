@@ -1,7 +1,7 @@
 // The 3D puzzle: renders a level, handles drag-to-rotate, pinch-to-zoom and
 // tap-to-move, and animates cubes flying away or bumping into each other.
 
-import * as THREE from 'three';
+import * as THREE from '../vendor/three.module.min.js';
 import { RoundedBoxGeometry } from '../vendor/RoundedBoxGeometry.js';
 import { DIRS, key, blockerDistance, boundsOf } from './levels.js';
 

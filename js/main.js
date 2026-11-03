@@ -9,6 +9,8 @@ import { nameProblem } from './names.js';
 import { confetti } from './confetti.js';
 
 const $ = (id) => document.getElementById(id);
+// Wire a control if it exists, so one missing element can't stop the others working.
+const on = (id, type, fn) => $(id)?.addEventListener(type, fn);
 let save = store.load();
 setSoundEnabled(save.sound);
 
@@ -416,6 +418,8 @@ function openSettings() {
 // ---------- start up ----------
 
 function init() {
+  // Set up updates first, so even a broken start can still receive a fix.
+  setupUpdates();
   try {
     game = new Game($('stage'), {
       onRemove: (remaining) => {
@@ -439,32 +443,34 @@ function init() {
   } catch (err) {
     console.error(err);
     $('error').classList.remove('hidden');
+    $('error-detail').textContent = `${err?.message || err} · ${navigator.userAgent}`;
     $('home').classList.add('hidden');
+    window.whooshReady = true; // the error is already shown with its reason
     return;
   }
 
   // Audio may only start after the first touch.
   window.addEventListener('pointerdown', unlockAudio, { once: false, passive: true });
 
-  $('play-btn').addEventListener('click', () => { play('click'); go('game', { level: save.unlocked }); });
-  $('levels-btn').addEventListener('click', () => { play('click'); go('levels'); });
-  $('board-btn').addEventListener('click', () => { play('click'); go('board'); });
-  $('board-join').addEventListener('submit', joinBoard);
-  $('rename-btn').addEventListener('click', () => { play('click'); renderBoard({ askName: true }); });
-  $('remove-btn').addEventListener('click', () => { play('click'); removeMe(); });
-  $('board-list').addEventListener('click', (e) => {
+  on('play-btn', 'click', () => { play('click'); go('game', { level: save.unlocked }); });
+  on('levels-btn', 'click', () => { play('click'); go('levels'); });
+  on('board-btn', 'click', () => { play('click'); go('board'); });
+  on('board-join', 'submit', joinBoard);
+  on('rename-btn', 'click', () => { play('click'); renderBoard({ askName: true }); });
+  on('remove-btn', 'click', () => { play('click'); removeMe(); });
+  on('board-list', 'click', (e) => {
     const btn = e.target.closest('.report-btn');
     if (btn) reportRow(Number(btn.dataset.row));
   });
-  $('settings-btn').addEventListener('click', () => { play('click'); go('home', { modal: 'settings' }); });
+  on('settings-btn', 'click', () => { play('click'); go('home', { modal: 'settings' }); });
   for (const b of document.querySelectorAll('[data-back]')) {
     b.addEventListener('click', () => { play('click'); history.back(); });
   }
-  $('restart-btn').addEventListener('click', () => { play('click'); startLevel(currentLevel); });
-  $('hint-btn').addEventListener('click', () => { play('click'); game.hint(); });
-  $('next-btn').addEventListener('click', () => { play('click'); go('game', { level: currentLevel + 1 }, true); });
-  $('win-menu-btn').addEventListener('click', () => { play('click'); history.back(); });
-  $('retry-btn').addEventListener('click', () => { play('click'); startLevel(currentLevel, { retry: true }); });
+  on('restart-btn', 'click', () => { play('click'); startLevel(currentLevel); });
+  on('hint-btn', 'click', () => { play('click'); game.hint(); });
+  on('next-btn', 'click', () => { play('click'); go('game', { level: currentLevel + 1 }, true); });
+  on('win-menu-btn', 'click', () => { play('click'); history.back(); });
+  on('retry-btn', 'click', () => { play('click'); startLevel(currentLevel, { retry: true }); });
 
   // Keep the speed-challenge clock ticking on screen, and pause it while the
   // app is in the background.
@@ -476,33 +482,32 @@ function init() {
     else game.resumeClock();
   });
 
-  $('sound-toggle').addEventListener('change', (e) => {
+  on('sound-toggle', 'change', (e) => {
     save.sound = e.target.checked;
     setSoundEnabled(save.sound);
     store.save(save);
     play('click');
   });
-  $('vibrate-toggle').addEventListener('change', (e) => {
+  on('vibrate-toggle', 'change', (e) => {
     save.vibrate = e.target.checked;
     store.save(save);
     vibrate(20);
   });
-  $('reset-btn').addEventListener('click', () => {
+  on('reset-btn', 'click', () => {
     if (confirm('Start over from level 1? Your stars and trophies will be cleared.')) {
       save = store.reset(save);
       setSoundEnabled(save.sound);
       openSettings();
     }
   });
-  $('settings-close').addEventListener('click', () => { play('click'); history.back(); });
+  on('settings-close', 'click', () => { play('click'); history.back(); });
 
   if (location.search.includes('debug')) window.whoosh = { game, startLevel };
 
   history.replaceState({ screen: 'home' }, '');
   show('home');
   submitScore(); // catch up on any score earned while offline
-
-  setupUpdates();
+  window.whooshReady = true;
 }
 
 // ---------- offline copy & updates ----------
@@ -517,7 +522,7 @@ function setupUpdates() {
     updating = false;
     location.reload();
   });
-  $('update-btn').addEventListener('click', () => {
+  on('update-btn', 'click', () => {
     if (!waitingWorker) return;
     updating = true;
     $('update-btn').disabled = true;
