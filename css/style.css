@@ -71,8 +71,23 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 
 #home {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
-  text-align: center;
+  display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: 14px;
+  text-align: center; overflow-y: auto;
+}
+#home > * { flex-shrink: 0; } /* never squash the logo or title; scroll instead */
+
+/* Shorter phones: tighten the home screen so it all fits. */
+@media (max-height: 860px) {
+  #home { gap: 10px; }
+  #home .logo { transform: scale(0.8); margin: -12px 0; }
+  #home h1 { font-size: 40px; margin-top: 0; }
+  #home .tagline { font-size: 17px; margin-bottom: 8px; }
+  #home .btn { min-height: 50px; padding: 8px 24px; font-size: 19px; }
+  #home .btn.big { min-height: 58px; font-size: 22px; }
+}
+@media (max-height: 700px) {
+  #home .logo { display: none; }
+  #home .tagline { display: none; }
 }
 #home h1 { font-size: 46px; margin: 8px 0 0; letter-spacing: -0.5px; }
 .tagline { font-size: 19px; color: var(--ink-soft); margin: 0 0 18px; line-height: 1.45; }
