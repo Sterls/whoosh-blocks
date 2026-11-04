@@ -639,8 +639,10 @@ async function renderDuels() {
   list.innerHTML = mine.map((x, i) => {
     const d = loaded[i];
     const heading = x.role === 'sent' ? `You challenged friends · Level ${x.level}` : `From ${escapeHtml(x.name)} · Level ${x.level}`;
-    if (d === null) return `<div class="duel-card"><h3>${heading}</h3><p class="sub">This challenge has expired.</p></div>`;
-    if (d === undefined) return `<div class="duel-card"><h3>${heading}</h3><p class="sub">Couldn't load.</p></div>`;
+    const remove = `<button class="duel-remove" data-remove="${i}" aria-label="Remove this challenge">✕</button>`;
+    const card = (body) => `<div class="duel-card">${remove}<h3>${heading}</h3>${body}</div>`;
+    if (d === null) return card('<p class="sub">This challenge has expired.</p>');
+    if (d === undefined) return card('<p class="sub">Couldn\'t load.</p>');
     const rows = [{ name: d.name, time_ms: d.time_ms, bumps: d.bumps, owner: true }, ...d.results]
       .sort((a, b) => duelScore(a) - duelScore(b));
     const items = rows.map((r, n) => {
@@ -651,9 +653,21 @@ async function renderDuels() {
     const action = x.role === 'sent'
       ? `<button class="btn secondary" data-share="${i}">Share again</button><button class="btn" data-beat="${i}">Beat your score</button>`
       : `<button class="btn" data-play="${i}">Play</button>`;
-    return `<div class="duel-card"><h3>${heading}</h3>${nobody}<ol>${items}</ol><div class="actions">${action}</div></div>`;
+    return card(`${nobody}<ol>${items}</ol><div class="actions">${action}</div>`);
   }).join('');
   renderDuels.loaded = loaded;
+}
+
+// Take a challenge off this phone's list. It isn't deleted for anyone else:
+// friends with the link can still play it.
+function removeDuel(i) {
+  const x = (save.duels || [])[i];
+  if (!x) return;
+  const what = x.role === 'sent' ? 'your challenge' : `${x.name}'s challenge`;
+  if (!confirm(`Remove ${what} (level ${x.level}) from your list?`)) return;
+  save.duels.splice(i, 1);
+  store.save(save);
+  renderDuels();
 }
 
 // ---------- live races ----------
@@ -1008,6 +1022,8 @@ function init() {
     const share = e.target.closest('[data-share]');
     const playBtn = e.target.closest('[data-play]');
     const beatBtn = e.target.closest('[data-beat]');
+    const removeBtn = e.target.closest('[data-remove]');
+    if (removeBtn) { play('click'); removeDuel(Number(removeBtn.dataset.remove)); return; }
     const loaded = renderDuels.loaded || [];
     if (share && loaded[share.dataset.share]) { play('click'); shareDuel(loaded[share.dataset.share]); }
     if (playBtn && loaded[playBtn.dataset.play]) { play('click'); acceptDuel(loaded[playBtn.dataset.play]); }
