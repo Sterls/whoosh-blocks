@@ -143,7 +143,7 @@ No new app build is needed.
 | Target audience | **13–15, 16–17, 18+** (not under 13). "Could the app appeal to children?" **No** |
 | News app | No |
 | COVID-19 contact tracing / status | No |
-| Data safety | ⚠️ **No data collected, no data shared.** (Once the leaderboard is on: collected, **not shared**, **optional**, encrypted in transit, users can request deletion. Data types: **Personal info → Name** (the nickname), **App info and performance → Other** or **App activity → Other actions** (furthest level), **Device or other IDs** (the random player ID). Purpose for all: **App functionality**.) |
+| Data safety | ⚠️ **No data collected, no data shared.** (Once the leaderboard is on: collected, **not shared**, **optional**, encrypted in transit, users can request deletion. Data types: **Personal info → Name** (the nickname), **App info and performance → Other** or **App activity → Other actions** (total points and furthest level), **Device or other IDs** (the random player ID). Purpose for all: **App functionality**.) |
 | Government app | No |
 | Financial features | None |
 | Health | None |

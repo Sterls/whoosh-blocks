@@ -23,7 +23,7 @@ Tick items off as they're done (`- [x]`).
 ## 2. Privacy (UK GDPR, store rules)
 
 - [x] Write a privacy policy and host it next to the game (`privacy.html`). It must say:
-  - what's collected: leaderboard name, a random player ID, furthest level beaten
+  - what's collected: leaderboard name, a random player ID, total points and furthest level beaten
   - what the database and hosting providers see: IP addresses in their logs
   - who processes it (Supabase, the hosting provider) and where
   - how long it's kept

@@ -53,7 +53,7 @@
     </div>
     <h1>Whoosh Blocks</h1>
     <p class="tagline">Tap a cube to send it flying.<br>Clear them all!</p>
-    <p id="trophy-count" class="trophy-count hidden"></p>
+    <p class="home-stats"><span id="points-count" class="trophy-count hidden"></span><span id="trophy-count" class="trophy-count hidden"></span></p>
     <button id="play-btn" class="btn big">Play</button>
     <button id="levels-btn" class="btn secondary">Levels</button>
     <button id="board-btn" class="btn secondary">Leaderboard</button>
@@ -190,6 +190,7 @@
       <div id="win-trophy" class="trophy hidden" aria-hidden="true">🏆</div>
       <h2 id="win-title">Level complete!</h2>
       <p id="win-text"></p>
+      <p id="win-points" class="win-points hidden"></p>
       <p id="win-stats" class="win-stats"></p>
       <p id="win-streak" class="win-streak hidden"></p>
       <button id="next-btn" class="btn big">Next level</button>

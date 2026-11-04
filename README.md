@@ -11,7 +11,12 @@ in the way, it bumps and comes back. Clear every cube to finish the level.
 - Levels never run out: each level number is generated on the fly, bigger and
   trickier as you go, and every level is guaranteed solvable (they are built
   by solving backwards; see `js/levels.js`).
-- **Leaderboard** shows who has beaten the furthest level (optional, see below).
+- **Points:** each level is worth 10 points per cube, plus a speed bonus of up
+  to the same again for finishing faster than the target time (2 seconds per
+  cube + 5), minus 20 per bump (minimum 10% of the base). Your total is your
+  best score on every level beaten, so replaying faster raises it
+  (`js/points.js`).
+- **Leaderboard** ranks players by total points (optional, see below).
 - **Challenges** every 5th level (from level 5) win trophies, rotating through:
   - **Picture**: the cubes form a picture (heart, house, cat, …) in its own colours.
   - **Perfect run**: no bumps allowed; a bump starts the level over.

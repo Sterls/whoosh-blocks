@@ -18,6 +18,7 @@ create table if not exists public.scores (
   hidden boolean not null default false
 );
 alter table public.scores add column if not exists hidden boolean not null default false;
+alter table public.scores add column if not exists points bigint not null default 0;
 
 create table if not exists public.reports (
   reporter uuid not null,
@@ -31,10 +32,10 @@ alter table public.scores enable row level security;
 alter table public.reports enable row level security;
 
 create or replace view public.leaderboard as
-  select name, level
+  select name, level, points
   from public.scores
-  where level > 0 and not hidden
-  order by level desc, updated_at asc
+  where (level > 0 or points > 0) and not hidden
+  order by points desc, level desc, updated_at asc
   limit 100;
 
 grant select on public.leaderboard to anon;
@@ -104,6 +105,49 @@ begin
     where secret = p_secret;
   else
     insert into scores (secret, name, level) values (p_secret, trim(p_name), least(p_level, 100));
+  end if;
+
+  delete from scores where updated_at < now() - interval '12 months';
+end;
+$$;
+
+-- Points version, used by the current game: the leaderboard ranks by points.
+-- Points, like levels, can only rise at a realistic pace: about 100 a second
+-- since the last rise, plus some slack. Anything more is capped, not
+-- rejected, so honest players catch up on their next submission.
+create or replace function public.submit_score(p_secret uuid, p_name text, p_level int, p_points bigint)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  old scores%rowtype;
+  secs double precision;
+  new_level int;
+  new_points bigint;
+begin
+  if not name_ok(p_name) then
+    raise exception 'name not allowed' using errcode = '22023';
+  end if;
+  if p_level < 0 or p_level > 10000000 or p_points < 0 or p_points > 2000000000 then
+    raise exception 'score out of range' using errcode = '22023';
+  end if;
+
+  select * into old from scores where secret = p_secret;
+  if found then
+    secs := extract(epoch from now() - old.updated_at);
+    new_level := greatest(old.level, least(p_level, old.level + 5 + floor(secs / 20)::int));
+    new_points := greatest(old.points, least(p_points, old.points + 2000 + floor(secs * 100)::bigint));
+    update scores set
+      name = trim(p_name),
+      level = new_level,
+      points = new_points,
+      updated_at = case when new_level > old.level or new_points > old.points then now() else old.updated_at end
+    where secret = p_secret;
+  else
+    insert into scores (secret, name, level, points)
+      values (p_secret, trim(p_name), least(p_level, 100), least(p_points, 50000));
   end if;
 
   delete from scores where updated_at < now() - interval '12 months';
@@ -267,3 +311,5 @@ revoke all on function public.submit_duel_result(text, uuid, text, int, int) fro
 grant execute on function public.get_duel(text) to anon;
 grant execute on function public.create_duel(uuid, text, int, int, int) to anon;
 grant execute on function public.submit_duel_result(text, uuid, text, int, int) to anon;
+revoke all on function public.submit_score(uuid, text, int, bigint) from public;
+grant execute on function public.submit_score(uuid, text, int, bigint) to anon;

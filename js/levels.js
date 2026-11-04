@@ -303,23 +303,18 @@ const PALETTES = [
   ['#f7a072', '#eddea4', '#9bc1bc'],
 ];
 
-export function getLevel(n) {
+// The shape of level n before its arrows are chosen, plus the random
+// generator in exactly the state the arrows need. Choosing arrows is the slow
+// part, so this is cheap: use it when only a level's size matters.
+function levelShape(n) {
   const rng = mulberry32(n * 7919 + 12345);
   const palette = PALETTES[(n - 1) % PALETTES.length];
-
-  if (n <= TUTORIAL.length) {
-    return { number: n, palette, cubes: TUTORIAL[n - 1].cells.map((c) => c.slice()) };
-  }
-
   const challenge = challengeType(n);
   if (challenge === 'picture') {
     const index = (n / 5 - 1) / CHALLENGES.length;
     const picture = PICTURES[index % PICTURES.length];
     const depth = n < 25 ? 1 : 2; // flat pictures while the game is still easy
-    return {
-      number: n, palette, challenge, picture: picture.name, front: true,
-      cubes: assignDirections(pictureCells(picture, depth), rng, Math.min(0.8, 0.35 + n * 0.02)),
-    };
+    return { rng, palette, challenge, picture, cells: pictureCells(picture, depth), tangle: Math.min(0.8, 0.35 + n * 0.02) };
   }
 
   // Size grows slowly with level: about 2 -> 7 cubes per side. Timed, tap
@@ -345,8 +340,24 @@ export function getLevel(n) {
     cells = shape(X, Y, Z);
   }
   if (cells.length < 4) cells = box(2, 2, 2);
+  return { rng, palette, challenge, cells, tangle: Math.min(1, 0.35 + n * 0.02) };
+}
 
-  const tangle = Math.min(1, 0.35 + n * 0.02);
+// How many cubes level n has, without building the whole level.
+export function cubeCount(n) {
+  return n <= TUTORIAL.length ? TUTORIAL[n - 1].cells.length : levelShape(n).cells.length;
+}
+
+export function getLevel(n) {
+  if (n <= TUTORIAL.length) {
+    const palette = PALETTES[(n - 1) % PALETTES.length];
+    return { number: n, palette, cubes: TUTORIAL[n - 1].cells.map((c) => c.slice()) };
+  }
+  const { rng, palette, challenge, picture, cells, tangle } = levelShape(n);
+  if (picture) {
+    return { number: n, palette, challenge, picture: picture.name, front: true, cubes: assignDirections(cells, rng, tangle) };
+  }
+
   const level = { number: n, palette, cubes: assignDirections(cells, rng, tangle) };
   if (challenge) level.challenge = challenge;
   const count = level.cubes.length;

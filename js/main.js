@@ -10,6 +10,7 @@ import { confetti } from './confetti.js';
 import { duelScore, formatMs, describe, outcome, codeFromUrl, duelLink } from './duel.js';
 import { MAX_PLAYERS, newRoomCode, roomFromUrl, pickLevels, totalCubes, standings } from './race.js';
 import { joinRoom } from './race-net.js';
+import { levelPoints, levelBest, totalPoints } from './points.js';
 
 const $ = (id) => document.getElementById(id);
 // Wire a control if it exists, so one missing element can't stop the others working.
@@ -84,6 +85,9 @@ function show(screen) {
     const trophies = Object.keys(save.trophies).length;
     $('trophy-count').textContent = `🏆 ${trophies} ${trophies === 1 ? 'trophy' : 'trophies'}`;
     $('trophy-count').classList.toggle('hidden', trophies === 0);
+    const points = totalPoints(save);
+    $('points-count').textContent = `⭐ ${points.toLocaleString()} points`;
+    $('points-count').classList.toggle('hidden', points === 0);
     $('board-btn').classList.toggle('hidden', !board.isConfigured());
     $('duels-btn').classList.toggle('hidden', !board.isConfigured());
     $('race-btn').classList.toggle('hidden', !board.isConfigured());
@@ -172,7 +176,7 @@ const bestLevel = () => save.unlocked - 1;
 
 function submitScore() {
   if (!board.isConfigured() || !save.name) return Promise.resolve();
-  return board.submit(save.playerId, save.name, bestLevel()).catch(() => {});
+  return board.submit(save.playerId, save.name, bestLevel(), totalPoints(save)).catch(() => {});
 }
 
 function escapeHtml(text) {
@@ -192,7 +196,7 @@ async function joinBoard(e) {
   if (problem) return;
   play('click');
   try {
-    await board.submit(save.playerId, name, bestLevel());
+    await board.submit(save.playerId, name, bestLevel(), totalPoints(save));
   } catch (err) {
     if (err.nameRejected) {
       $('name-error').textContent = 'Please choose a friendlier nickname.';
@@ -250,14 +254,14 @@ async function renderBoard({ askName = false } = {}) {
     return;
   }
 
-  $('board-me-text').textContent = `You: ${save.name} · level ${bestLevel()}`;
+  $('board-me-text').textContent = `You: ${save.name} · ${totalPoints(save).toLocaleString()} pts`;
   $('board-me').classList.remove('hidden');
   status.textContent = 'Loading…';
   try {
     await submitScore();
     const rows = await board.fetchTop(50);
     if ($('board').classList.contains('hidden')) return;
-    status.textContent = rows.length ? 'Furthest level beaten' : 'No scores yet. Beat a level to get on the board!';
+    status.textContent = rows.length ? 'Total points' : 'No scores yet. Beat a level to get on the board!';
     const medals = ['🥇', '🥈', '🥉'];
     shownRows = rows;
     list.innerHTML = rows.map((r, i) => {
@@ -269,7 +273,7 @@ async function renderBoard({ askName = false } = {}) {
       <li class="${mine ? 'me' : ''}">
         <span class="rank">${medals[i] || i + 1}</span>
         <span class="who">${escapeHtml(r.name)}</span>
-        <span class="lvl">Level ${r.level}</span>
+        <span class="lvl">${Number(r.points || 0).toLocaleString()} pts</span>
         ${flag}
       </li>`;
     }).join('');
@@ -414,6 +418,10 @@ function onWin(mistakes) {
   const stars = starsFor(mistakes);
   const result = challengeResult(current);
   const firstClear = currentLevel >= save.unlocked;
+  const pts = levelPoints(current.cubes.length, game.elapsed, mistakes);
+  const previousBest = firstClear ? null : levelBest(save, currentLevel);
+  save.points = save.points || {};
+  save.points[currentLevel] = Math.max(previousBest ?? 0, pts.total);
   save.stars[currentLevel] = Math.max(save.stars[currentLevel] || 0, stars);
   if (result?.trophy) save.trophies[currentLevel] = true;
   save.unlocked = Math.max(save.unlocked, currentLevel + 1);
@@ -427,6 +435,15 @@ function onWin(mistakes) {
   const milestone = firstClear && currentLevel % 10 === 0;
   if (milestone) setTimeout(() => confetti(levelColors(), { count: 160, duration: 3200 }), 300);
 
+  const parts = [`${pts.base} for the cubes`];
+  if (pts.speed) parts.push(`+${pts.speed} speed`);
+  if (pts.penalty) parts.push(`−${pts.penalty} bumps`);
+  let note = '';
+  if (previousBest != null) {
+    note = pts.total > previousBest ? `New best here! +${pts.total - previousBest} to your total` : `Your best here: ${previousBest.toLocaleString()}`;
+  }
+  $('win-points').innerHTML = `+${pts.total.toLocaleString()} points<small>${parts.join(' · ')}${note ? `<br>${note}` : ''}</small>`;
+  $('win-points').classList.remove('hidden');
   const cubes = current.cubes.length;
   $('win-stats').textContent = `${cubes} cubes cleared` + (game.elapsed >= 1 ? ` in ${formatTime(game.elapsed)}` : '');
   const streak = save.perfectStreak;
@@ -580,6 +597,7 @@ async function onDuelWin(mistakes) {
 
   $('win-stars').classList.add('hidden');
   $('win-streak').classList.add('hidden');
+  $('win-points').classList.add('hidden');
   $('win-trophy').classList.remove('hidden', 'missed');
   $('win-trophy').textContent = result === 'lose' ? '⚔️' : '🏆';
   $('win-title').classList.remove('milestone');

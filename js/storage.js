@@ -5,7 +5,7 @@ const KEY = 'whoosh-blocks-save-v1';
 const OLD_KEY = 'cube-away-save-v1';
 
 const defaults = () => ({
-  unlocked: 1, stars: {}, trophies: {}, sound: true, vibrate: true, seenHelp: false,
+  unlocked: 1, stars: {}, trophies: {}, points: {}, // points: best score per level sound: true, vibrate: true, seenHelp: false,
   name: '', playerId: '', // leaderboard identity
 });
 

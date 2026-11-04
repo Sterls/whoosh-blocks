@@ -27,15 +27,15 @@ async function request(path, options = {}) {
 
 const rpc = (fn, args) => request(`/rest/v1/rpc/${fn}`, { method: 'POST', body: JSON.stringify(args) });
 
-// Top players, best first: [{ name, level }]
+// Top players, most points first: [{ name, level, points }]
 export async function fetchTop(limit = 50) {
-  const res = await request(`/rest/v1/leaderboard?select=name,level&limit=${limit}`);
+  const res = await request(`/rest/v1/leaderboard?select=name,level,points&limit=${limit}`);
   return res.json();
 }
 
-// Record this phone's furthest level. Never lowers an existing score.
-export async function submit(secret, name, level) {
-  await rpc('submit_score', { p_secret: secret, p_name: name, p_level: level });
+// Record this phone's furthest level and total points. Never lowers a score.
+export async function submit(secret, name, level, points) {
+  await rpc('submit_score', { p_secret: secret, p_name: name, p_level: level, p_points: points });
 }
 
 // Flag a nickname as inappropriate. Three reports from different players hide it.
