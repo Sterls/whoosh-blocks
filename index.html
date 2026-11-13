@@ -11,6 +11,15 @@
   <link rel="apple-touch-icon" href="icons/icon-180.png">
   <link rel="stylesheet" href="css/style.css">
   <script>
+    // Pick light or dark before anything is drawn, so the screen doesn't flash.
+    try {
+      var theme = (JSON.parse(localStorage.getItem('whoosh-blocks-save-v1') || '{}').theme) || 'auto';
+      if (theme === 'auto') theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = theme;
+      if (theme === 'dark') document.querySelector('meta[name=theme-color]').content = '#1d1b33';
+    } catch (e) { /* stays light */ }
+  </script>
+  <script>
     // If the game can't start (an old or unusual browser), say so instead of
     // leaving buttons that do nothing, and show why so it can be reported.
     (function () {
@@ -206,6 +215,11 @@
       <h2 id="settings-title">Settings</h2>
       <label class="toggle"><span>Sound</span><input type="checkbox" id="sound-toggle"><i></i></label>
       <label class="toggle"><span>Vibration</span><input type="checkbox" id="vibrate-toggle"><i></i></label>
+      <div class="setting-row"><span>Theme</span>
+        <div class="seg" id="theme-choice" role="group" aria-label="Theme">
+          <button type="button" data-theme-choice="auto">Auto</button><button type="button" data-theme-choice="light">Light</button><button type="button" data-theme-choice="dark">Dark</button>
+        </div>
+      </div>
       <button id="reset-btn" class="btn ghost danger">Reset progress</button>
       <button id="settings-close" class="btn">Done</button>
       <a class="link-btn" href="privacy.html">Privacy policy &amp; licences</a>

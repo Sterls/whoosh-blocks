@@ -5,7 +5,10 @@ const KEY = 'whoosh-blocks-save-v1';
 const OLD_KEY = 'cube-away-save-v1';
 
 const defaults = () => ({
-  unlocked: 1, stars: {}, trophies: {}, points: {}, // points: best score per level sound: true, vibrate: true, seenHelp: false,
+  unlocked: 1, stars: {}, trophies: {},
+  points: {}, // best score per level
+  sound: true, vibrate: true, seenHelp: false,
+  theme: 'auto', // 'auto' follows the phone's dark mode
   name: '', playerId: '', // leaderboard identity
 });
 
@@ -46,7 +49,7 @@ export function save(data) {
 
 // Start the levels over, but keep the leaderboard name and id.
 export function reset(old) {
-  const fresh = { ...defaults(), name: old.name, playerId: old.playerId };
+  const fresh = { ...defaults(), name: old.name, playerId: old.playerId, theme: old.theme };
   save(fresh);
   return fresh;
 }

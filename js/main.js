@@ -919,9 +919,20 @@ function onFail() {
 
 // ---------- settings ----------
 
+// Light or dark colours. 'auto' follows the phone's own dark mode setting.
+const darkQuery = window.matchMedia?.('(prefers-color-scheme: dark)');
+function applyTheme() {
+  const choice = save.theme || 'auto';
+  const theme = choice === 'auto' ? (darkQuery?.matches ? 'dark' : 'light') : choice;
+  document.documentElement.dataset.theme = theme;
+  document.querySelector('meta[name=theme-color]')?.setAttribute('content', theme === 'dark' ? '#1d1b33' : '#efe9ff');
+  for (const b of document.querySelectorAll('[data-theme-choice]')) b.classList.toggle('on', b.dataset.themeChoice === choice);
+}
+
 function openSettings() {
   $('sound-toggle').checked = save.sound;
   $('vibrate-toggle').checked = save.vibrate;
+  applyTheme();
   $('settings').classList.remove('hidden');
 }
 
@@ -930,6 +941,7 @@ function openSettings() {
 function init() {
   // Set up updates first, so even a broken start can still receive a fix.
   setupUpdates();
+  applyTheme();
   try {
     game = new Game($('stage'), {
       onRemove: (remaining) => {
@@ -1051,6 +1063,15 @@ function init() {
     store.save(save);
     vibrate(20);
   });
+  on('theme-choice', 'click', (e) => {
+    const b = e.target.closest('[data-theme-choice]');
+    if (!b) return;
+    play('click');
+    save.theme = b.dataset.themeChoice;
+    store.save(save);
+    applyTheme();
+  });
+  darkQuery?.addEventListener?.('change', applyTheme);
   on('reset-btn', 'click', () => {
     if (confirm('Start over from level 1? Your stars and trophies will be cleared.')) {
       save = store.reset(save);
