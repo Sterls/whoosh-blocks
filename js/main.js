@@ -922,7 +922,7 @@ function onFail() {
 // Light or dark colours. 'auto' follows the phone's own dark mode setting.
 const darkQuery = window.matchMedia?.('(prefers-color-scheme: dark)');
 function applyTheme() {
-  const choice = save.theme || 'auto';
+  const choice = save.theme || 'dark';
   const theme = choice === 'auto' ? (darkQuery?.matches ? 'dark' : 'light') : choice;
   document.documentElement.dataset.theme = theme;
   document.querySelector('meta[name=theme-color]')?.setAttribute('content', theme === 'dark' ? '#1d1b33' : '#efe9ff');

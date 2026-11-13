@@ -8,7 +8,7 @@ const defaults = () => ({
   unlocked: 1, stars: {}, trophies: {},
   points: {}, // best score per level
   sound: true, vibrate: true, seenHelp: false,
-  theme: 'auto', // 'auto' follows the phone's dark mode
+  theme: 'dark', // 'dark', 'light', or 'auto' to follow the phone
   name: '', playerId: '', // leaderboard identity
 });
 

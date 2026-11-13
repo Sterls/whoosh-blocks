@@ -5,12 +5,12 @@ const mem = new Map();
 globalThis.localStorage = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) };
 const store = await import('../js/storage.js');
 
-test('a brand-new player starts with sound and vibration on, and the automatic theme', () => {
+test('a brand-new player starts with sound and vibration on, and dark mode', () => {
   mem.clear();
   const s = store.load();
   assert.equal(s.sound, true);
   assert.equal(s.vibrate, true);
-  assert.equal(s.theme, 'auto');
+  assert.equal(s.theme, 'dark');
   assert.equal(s.unlocked, 1);
 });
 
